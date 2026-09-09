@@ -1,0 +1,6 @@
+__pycache__/
+*.egg-info/
+.venv/
+dist/
+# The bot token lives here: never in the repo.
+.env
