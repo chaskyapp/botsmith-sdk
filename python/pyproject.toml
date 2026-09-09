@@ -18,4 +18,7 @@ dependencies = ["httpx>=0.27"]
 Repository = "https://github.com/chaskyapp/botsmith-sdk"
 
 [tool.hatch.build.targets.wheel]
+# One distribution, two entrypoints: chasky_botsmith and
+# chasky_botsmith.management. Same shape as the npm subpath and the Go
+# subpackage — see D13 in the contract.
 packages = ["chasky_botsmith"]

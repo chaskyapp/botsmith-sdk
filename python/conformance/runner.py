@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from .fake import FakeServer
+from .management_adapter import ManagementUnderTest, encode
+from .management_adapter import factory as sdk_management_factory
 from .matchers import Captures, match_headers, match_partial
 
 #: A fixed test credential. Never a real token; cases refer to it as {token}.
@@ -70,7 +72,14 @@ def load_cases(directory: Path) -> list[dict[str, Any]]:
     return [json.loads(path.read_text()) for path in sorted(directory.glob("*.json"))]
 
 
-async def run_case(case: dict[str, Any], factory: Factory) -> list[Failure]:
+async def run_case(
+    case: dict[str, Any],
+    factory: Factory,
+    management_factory: Any = None,
+) -> list[Failure]:
+    if case.get("kind") == "management":
+        return await run_management_case(case, management_factory or sdk_management_factory)
+
     fake = FakeServer(case["exchanges"])
     failures: list[Failure] = []
     bot: BotUnderTest | None = None
@@ -99,6 +108,82 @@ async def run_case(case: dict[str, Any], factory: Factory) -> list[Failure]:
     failures.extend(_check_requests(case, fake))
     if bot is not None:
         failures.extend(_check_assertions(case, bot))
+    return failures
+
+
+async def run_management_case(case: dict[str, Any], factory: Any) -> list[Failure]:
+    """Invoke methods in order; nothing polls, so there is no loop to wait on.
+
+    The exchange list and every matcher work exactly as they do for the runtime.
+    That reuse is why both kinds share one format.
+    """
+    fake = FakeServer(case["exchanges"])
+    failures: list[Failure] = []
+    client: ManagementUnderTest | None = None
+    try:
+        client = factory(fake.base_url)
+        for call in case.get("calls", []):
+            await client.invoke(call["method"], call.get("args") or {})
+    finally:
+        if client is not None:
+            await client.aclose()
+        fake.close()
+
+    failures.extend(_check_requests(case, fake))
+    if client is not None:
+        failures.extend(_check_management_assertions(case, client))
+    return failures
+
+
+def _check_management_assertions(case: dict[str, Any], client: ManagementUnderTest) -> list[Failure]:
+    failures: list[Failure] = []
+    want = case.get("assert", {})
+
+    for index, expected in enumerate(want.get("errorsReported", [])):
+        if index >= len(client.errors):
+            failures.append(
+                Failure("assert.errorsReported", f"expected an error at position {index}, none was reported")
+            )
+            continue
+        actual = client.errors[index]
+        checks = (
+            ("managementCode", "management_code"),
+            ("retryable", "retryable"),
+            ("accessLost", "access_lost"),
+        )
+        for case_field, attr in checks:
+            if expected.get(case_field) is not None and getattr(actual, attr) != expected[case_field]:
+                failures.append(
+                    Failure(
+                        "assert.errorsReported",
+                        f"error #{index + 1}: expected {case_field}={expected[case_field]}, "
+                        f"got {getattr(actual, attr)}",
+                    )
+                )
+    if not want.get("errorsReported") and client.errors:
+        codes = [error.management_code or error.message for error in client.errors]
+        failures.append(Failure("assert.errorsReported", f"expected no errors, got {codes}"))
+
+    secret = want.get("secretReturnedOnce")
+    if secret:
+        if secret not in encode(client.results):
+            failures.append(Failure("assert.secretReturnedOnce", "the revealed token never reached the caller"))
+        # The one response carrying a live token is response-only by the server's
+        # own design. If the SDK lets it reach a log line, an error, or its own
+        # representation, it undoes the only protection built for it.
+        places = {
+            "errors": encode(client.errors),
+            "warnings": encode(client.warnings),
+            "repr": client.describe(),
+        }
+        for place in want.get("secretNotIn", []):
+            if secret in places.get(place, ""):
+                failures.append(
+                    Failure(
+                        "assert.secretNotIn",
+                        f"the revealed token LEAKED into {place}; it must reach the return value only",
+                    )
+                )
     return failures
 
 
