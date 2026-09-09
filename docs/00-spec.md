@@ -471,10 +471,14 @@ runtime, `botsmith` para la gestión), escrito como cada ecosistema lo escribe.
 El scope `@chasky/` de npm está **confirmado disponible** (2026-09-08), y es el
 que fija el estándar para los otros dos.
 
+**Pendiente, D13:** desde que `botsmith` pasó a nombrar al producto completo
+(D9), el paquete de **gestión** necesita otro nombre. La recomendación es
+`bot-management`, que es como se llama la ruta que consume.
+
 | | Runtime | Gestión |
 |---|---|---|
-| npm | `@chasky/bot` ✅ | `@chasky/botsmith` ✅ |
-| Go | `github.com/chaskyapp/bot-sdk/go` (`package chaskybot`) | `.../bot-sdk/go/botsmith` |
+| npm | `@chasky/bot` ✅ | `@chasky/botsmith` — **en revisión, D13** |
+| Go | `github.com/chaskyapp/botsmith-sdk/go` (`package chaskybot`) | `.../botsmith-sdk/go/botsmith` |
 | PyPI | `chasky-bot` | `chasky-botsmith` |
 
 ---
@@ -777,7 +781,7 @@ de código.
 | **D6** | Dedup por `update_id` | **Umbral `> lastSeen`**: un entero, sin estructura de datos | Verificado en el código (abajo). Es más barato **y** más correcto que una ventana finita |
 | **D7** | Persistencia del offset | Gancho `OffsetStore` **opcional**, default en memoria | Un default con disco sorprende; uno con memoria reprocesa **y se ve**. Y el estado es **un solo entero** (abajo) |
 | **D8** | `http://` no local | **Advertir una vez**, no negarse; opción explícita para silenciar | Negarse rompe staging interno legítimo — TLS terminado en el ingress, túneles, compose |
-| **D9** | Layout y nombres | **Monorepo `bot-sdk`**, un directorio por lenguaje en la raíz; scope npm **`@chasky/`** confirmado disponible | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
+| **D9** | Layout y nombres | **Monorepo `botsmith-sdk`** —BotSmith nombra al **producto de bots completo**, no solo al gestor—, un directorio por lenguaje en la raíz; scope npm **`@chasky/`** confirmado disponible | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
 | **D10** | Formato de la conformidad | **Casos JSON** + un fake HTTP por lenguaje | Idiomático y sin proceso externo. Decisión **reversible** (abajo) |
 | **D11** | Versionado | **Independiente por paquete** + versión del contrato declarada aparte | La pregunta que importa no es qué versión tiene el paquete, sino qué garantías implementa |
 
@@ -879,6 +883,7 @@ La versión del contrato es `MAJOR.MINOR`: **MINOR** cuando se agrega una garant
 
 | # | Decisión | Recomendación | Qué falta |
 |---|---|---|---|
+| **D13** | Nombre del paquete de **gestión** | **`@chasky/bot-management`** / `.../go/management` / `chasky-bot-management` | Consecuencia directa de D9. Con `botsmith` nombrando al producto entero, ya no puede nombrar también a una de sus dos partes: `botsmith-sdk/go/botsmith` diría *botsmith* dos veces significando cosas distintas en cada nivel. La recomendación **espeja la ruta que consume** (`/bot-management`), así que no inventa vocabulario. Choca con que ya confirmaste `@chasky/botsmith` disponible en npm — por eso queda abierta y no la cierro yo |
 | **D12** | Traducir `docs/` al inglés | **DISPARADA el 2026-09-08**: D5, D7, D8, D10 y D11 cerraron, así que esto es lo único pendiente. Incluye renombrar `01-organizacion.md` → `01-organization.md`, actualizar los enlaces y quitar los avisos *"(in Spanish for now)"* de los READMEs | Ya no espera nada. Queda en esta lista hasta ejecutarse, que es exactamente para lo que estaba: un paso pendiente que no se cuenta es un paso que se olvida |
 
 ---

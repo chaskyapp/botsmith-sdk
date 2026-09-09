@@ -2,7 +2,7 @@
 
 **Delivery 2. Empty: no code yet.**
 
-- Module: `github.com/chaskyapp/bot-sdk/go`, `package chaskybot`. The package name
+- Module: `github.com/chaskyapp/botsmith-sdk/go`, `package chaskybot`. The package name
   does not match the directory on purpose — `package go` is not a thing.
 - Release tags carry the **subdirectory prefix**: `go/v0.1.0`, not `v0.1.0`.
   Without the prefix, `go get` fails in a confusing way.

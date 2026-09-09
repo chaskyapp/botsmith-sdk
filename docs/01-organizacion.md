@@ -32,7 +32,7 @@ porque es lo que se ve.
 ## 2. Layout
 
 ```
-bot-sdk/
+botsmith-sdk/
 ├── README.md
 ├── docs/
 │   ├── 00-spec.md              El contrato. Agnóstico de lenguaje.
@@ -40,15 +40,20 @@ bot-sdk/
 ├── conformance/
 │   ├── README.md               Cómo se corre y cómo se agrega un caso.
 │   └── cases/                  Casos declarativos. Fuente de verdad ejecutable.
-├── js/                         @chasky/bot + @chasky/botsmith  · entrega 1
+├── js/                         @chasky/bot + gestión (D13)     · entrega 1
 │   └── core/                   Interno, NO publicado. Ver 00-spec.md §6.
-├── go/                         .../bot-sdk/go  (+ /botsmith)    · entrega 2
+├── go/                         .../botsmith-sdk/go  (+ gestión, D13) · entrega 2
 │   └── internal/               Interno, no importable desde afuera.
 ├── python/                     chasky-bot + chasky-botsmith     · entrega 3
 │   └── _core/                  Interno por convención.
 └── reference/
     └── pepibot/                Cliente de conformidad (pendiente D5)
 ```
+
+**Nota de nombre**: `BotSmith` nombra al **producto de bots completo**, y por eso
+da nombre al repo. No nombra a la superficie de gestión, aunque la ruta del
+servidor sea `/bot-management` y el dominio del servidor use ese término — el
+nombre del paquete de gestión está en revisión (D13, §12 del contrato).
 
 Cada lenguaje publica **dos** paquetes —runtime y gestión— y guarda lo poco que
 comparten en un módulo **interno y no publicado**. El motivo de la separación
@@ -67,8 +72,8 @@ implementación a la vista, que es exactamente lo que el repo es.
 Go es el ecosistema que peor lleva los monorepos poliglotas, así que conviene
 dejarlo escrito antes de que alguien lo descubra solo:
 
-- `go/go.mod` declara `module github.com/chaskyapp/bot-sdk/go`.
-- El import queda `github.com/chaskyapp/bot-sdk/go`, y el paquete se llama
+- `go/go.mod` declara `module github.com/chaskyapp/botsmith-sdk/go`.
+- El import queda `github.com/chaskyapp/botsmith-sdk/go`, y el paquete se llama
   `chaskybot` — en Go el nombre del paquete no tiene que coincidir con el
   directorio, y `package go` no existe.
 - Los tags de release llevan el prefijo del subdirectorio: **`go/v0.1.0`**, no
@@ -252,7 +257,7 @@ El orden **dentro** de cada entrega importa tanto como el orden entre lenguajes.
 6. Mover `~/Desktop/pepibot/` a `reference/pepibot/` y **traducir sus comentarios
    al inglés** (D5). No se hizo antes a propósito: el archivo está en uso y
    copiarlo entonces habría creado dos versiones divergiendo desde el día uno.
-7. `bot-sdk/go`, mirando pepibot pero sin heredarlo (§5.4 del contrato).
+7. `botsmith-sdk/go`, mirando pepibot pero sin heredarlo (§5.4 del contrato).
 8. Runner de conformidad en Go, contra **los mismos casos**.
 9. **Reconciliar.** Acá aparecen los casos ambiguos. Corregir el caso y después
    las dos implementaciones — en ese orden.

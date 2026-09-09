@@ -7,7 +7,8 @@ of the public contract**, not documentation: half the traps this SDK exists to
 absorb are shape traps.
 
 Two packages ship from here — `@chasky/bot` (runtime, bot token) and
-`@chasky/botsmith` (management, human session + `X-Secret`). They are separate on
+a management package (human session + `X-Secret`; its name is under review — see
+D13). They are separate on
 purpose; see §6 of the contract. Whatever little they share lives in `core/`,
 which is **internal and never published**.
 

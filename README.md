@@ -1,4 +1,4 @@
-# bot-sdk — Client SDKs for the Chasky Bot API
+# botsmith-sdk — Client SDKs for the Chasky Bot API
 
 **Status: specification. No code yet, in any language.**
 
@@ -14,7 +14,7 @@ decisions that belong to each bot author.
 | Delivery | Language | Package | Status |
 |---|---|---|---|
 | 1 | TypeScript | `@chasky/bot` | [`js/`](js/) — empty |
-| 2 | Go | `github.com/chaskyapp/bot-sdk/go` | [`go/`](go/) — empty |
+| 2 | Go | `github.com/chaskyapp/botsmith-sdk/go` | [`go/`](go/) — empty |
 | 3 | Python | `chasky-bot` | [`python/`](python/) — empty |
 
 The order is TypeScript → Go → Python. The reason is in §5 of the contract: **a
@@ -57,6 +57,9 @@ Worth knowing before reading the contract: deduplication and the poll offset are
 **the same single integer** (`offset == lastSeen + 1`), verified against the
 server code. The SDK keeps one number, not a data structure.
 
-Packages are `@chasky/bot` and `@chasky/botsmith` on npm (scope confirmed
+The runtime package is `@chasky/bot` on npm (the `@chasky/` scope is confirmed
 available), and the same standard —the `chasky` identity plus the role in one
 word— carries over to Go and PyPI.
+
+The **management** package still needs a name: since `botsmith` now refers to the
+whole product, it can no longer name one of its two halves. See D13.
