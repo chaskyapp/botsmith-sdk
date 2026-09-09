@@ -83,6 +83,17 @@ dejarlo escrito antes de que alguien lo descubra solo:
 - Los tags de release llevan el prefijo del subdirectorio: **`go/v0.1.0`**, no
   `v0.1.0`. Es el mecanismo estándar de submódulos de Go, funciona con
   `go get`, y falla de forma confusa si alguien taggea sin el prefijo.
+- **El import no lleva prefijo `chasky-`, y es deliberado.** El module path de Go
+  tiene que coincidir con la URL donde vive el repo —si no, `go get` falla con
+  *"module declares its path as X but was required as Y"`*—, así que el path lo
+  fija el nombre del repositorio y no se elige aparte. Y la organización ya dice
+  `chaskyapp`, igual que en `github.com/chaskyapp/backend-api-go`: agregar el
+  prefijo diría *chasky* dos veces y obligaría a renombrar el repo.
+
+  Vale la aclaración porque en PyPI el prefijo **sí** hace falta (`chasky_botsmith`,
+  porque PyPI no tiene namespaces) y eso invita a querer simetría. La simetría ya
+  existe: los tres dicen "chasky", solo que npm lo pone en el scope, Go en la
+  organización y PyPI en el nombre, porque es el único que no tiene dónde más.
 - `go/` tiene su propio `go.sum` y su propio CI. No comparte nada de build con
   los otros dos.
 
