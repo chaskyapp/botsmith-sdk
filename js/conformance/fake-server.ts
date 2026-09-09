@@ -2,6 +2,13 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Exchange, Json, ObservedRequest } from "./types.js";
 
 /**
+ * How long the fake holds an idle steady-state poll. A real long poll blocks for
+ * seconds; answering instantly would let a healthy bot hammer the fake hundreds
+ * of times per case and bury a single defect under its own repetition.
+ */
+const STEADY_STATE_POLL_MS = 25;
+
+/**
  * An HTTP server driven by a case's exchange list.
  *
  * The exchange list is exhaustive by contract: anything the SDK sends beyond the
@@ -72,7 +79,8 @@ export class FakeServer {
     if (!steadyState) this.index++;
     const { respond } = exchange;
 
-    if (respond.delayMs) await sleep(respond.delayMs);
+    const delay = respond.delayMs ?? (steadyState ? STEADY_STATE_POLL_MS : 0);
+    if (delay) await sleep(delay);
 
     if (respond.transportError !== undefined) {
       // Kill the connection rather than answer. The client library is what turns

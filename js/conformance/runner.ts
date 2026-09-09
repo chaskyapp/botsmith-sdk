@@ -87,6 +87,9 @@ async function waitForCompletion(bot: BotUnderTest, server: FakeServer, timeoutM
 function checkRequests(testCase: ConformanceCase, server: FakeServer): Failure[] {
   const failures: Failure[] = [];
   const captures: Captures = new Map();
+  /** Per-request problems, collapsed at the end so one defect reads as one line. */
+  const perRequest: { index: number; detail: string }[] = [];
+  const note = (index: number, detail: string) => perRequest.push({ index, detail });
 
   const last = testCase.exchanges[testCase.exchanges.length - 1];
   const repeats = last?.repeat === true;
@@ -98,26 +101,38 @@ function checkRequests(testCase: ConformanceCase, server: FakeServer): Failure[]
     const expected = (testCase.exchanges[i] ?? last)!.expect;
     const actual = server.observed[i];
     if (!actual) {
-      failures.push(failure(`request #${i + 1}`, `expected ${describeExpected(expected)}, but the SDK never sent it`));
+      note(i + 1, `expected ${describeExpected(expected)}, but the SDK never sent it`);
       continue;
     }
     if (expected.method && expected.method !== actual.method) {
-      failures.push(failure(`request #${i + 1}`, `expected method ${expected.method}, got ${actual.method}`));
+      note(i + 1, `expected method ${expected.method}, got ${actual.method}`);
     }
     if (expected.path) {
       const want = expected.path.replaceAll("{token}", TEST_TOKEN);
       if (want !== actual.path) {
-        failures.push(failure(`request #${i + 1}`, `expected path ${redact(want)}, got ${redact(actual.path)}`));
+        note(i + 1, `expected path ${redact(want)}, got ${redact(actual.path)}`);
       }
     }
     if (expected.headers) {
       const reason = matchHeaders(expected.headers, actual.headers, captures);
-      if (reason) failures.push(failure(`request #${i + 1}`, reason));
+      if (reason) note(i + 1, reason);
     }
     if (expected.body) {
       const reason = matchPartial(expected.body as Record<string, Json>, actual.body, captures, "body");
-      if (reason) failures.push(failure(`request #${i + 1}`, reason));
+      if (reason) note(i + 1, reason);
     }
+  }
+
+  const byDetail = new Map<string, number[]>();
+  for (const { index, detail } of perRequest) {
+    (byDetail.get(detail) ?? byDetail.set(detail, []).get(detail)!).push(index);
+  }
+  for (const [detail, indexes] of byDetail) {
+    const where =
+      indexes.length === 1
+        ? `request #${indexes[0]}`
+        : `requests #${indexes[0]}-#${indexes[indexes.length - 1]} (${indexes.length} times)`;
+    failures.push(failure(where, detail));
   }
 
   if (server.extras.length > 0) {
