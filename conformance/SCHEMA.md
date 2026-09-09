@@ -78,13 +78,23 @@ Anywhere inside `body` or `headers`:
 |---|---|
 | a literal | must equal it |
 | `"$any"` | present and non-empty, value irrelevant |
-| `"$absent"` | the field must not be present |
+| `"$absent"` | **the key must not appear at all.** An explicit `null` VIOLATES it |
 | `"$capture:name"` | matches anything non-empty and remembers it as `name` |
 | `"$same:name"` | must equal a previously captured `name` |
 | `"$notSame:name"` | must be non-empty and differ from `name` |
 
 Capture/same/notSame is what makes G4 expressible: a fresh `Idempotency-Key` per
 logical message, the same one on a retry.
+
+**`$absent` is about the key, not the value**, and the distinction is the whole
+point of `m1`: the server rejects an explicit `null` even where a field is
+optional, so "present and null" is a failure, not a synonym for absent.
+
+This was ambiguous in the first draft, and all three runners read it differently
+— JavaScript failed correctly on a `null`, while Go and Python decoded it to
+`nil`/`None` and treated it as absent. Two runners silently accepted the exact
+mistake the case exists to catch. It only surfaced with the third port, which is
+what §5.2 of the contract predicted and the first two ports had not yet shown.
 
 ## `bot.handler`
 

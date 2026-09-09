@@ -32,7 +32,9 @@ async function main(): Promise<void> {
     );
   }
   const files = (await readdir(CASES_DIR)).filter((f) => f.endsWith(".json")).sort();
-  const selected = only ? files.filter((f) => f.includes(only)) : files;
+  // Match on the id's prefix, not anywhere in the name: `--only m` used to
+  // catch every case with an m in it, which is most of them.
+  const selected = only ? files.filter((f) => f.startsWith(only)) : files;
 
   if (selected.length === 0) {
     console.error(`no cases matched${only ? ` --only ${only}` : ""} in ${CASES_DIR}`);

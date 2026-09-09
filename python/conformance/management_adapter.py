@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -103,8 +104,24 @@ def factory(base_url: str) -> ManagementUnderTest:
 
 
 def encode(value: Any) -> str:
-    """Render anything for a substring check, dataclasses included."""
+    """Render anything for a substring check, looking INSIDE dataclasses.
+
+    Falling back to repr() here was wrong in a way worth remembering: the SDK
+    deliberately redacts ``CommandResult.__repr__`` and ``SecretReveal.__repr__``
+    so a token cannot land in a log. That protection then hid the token from the
+    runner's own ``secretReturnedOnce`` check, and m4 failed claiming the token
+    never reached the caller — when it had.
+
+    asdict() walks the fields without calling __repr__, so the check inspects the
+    real values while the redaction still protects every log path.
+    """
+
+    def fallback(obj: Any) -> Any:
+        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+            return dataclasses.asdict(obj)
+        return repr(obj)
+
     try:
-        return json.dumps(value, default=repr)
+        return json.dumps(value, default=fallback)
     except (TypeError, ValueError):
         return repr(value)

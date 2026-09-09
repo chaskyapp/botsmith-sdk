@@ -111,7 +111,10 @@ def match_partial(expected: dict[str, Any], actual: Any, captures: Captures, pat
         at = f"{path}.{key}" if path else key
         want = expected[key]
         if want == "$absent":
-            if key in actual and actual[key] is not None:
+            # Presence of the KEY is the failure. A decoded JSON null arrives
+            # here as None, and treating that as absent would accept the exact
+            # mistake m1 exists to catch.
+            if key in actual:
                 return f"{at}: expected the field to be absent, but it was {format_value(actual[key])}"
             continue
         if key not in actual:

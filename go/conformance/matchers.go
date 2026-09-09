@@ -114,7 +114,10 @@ func matchPartial(expected map[string]any, actual any, captures Captures, path s
 		}
 		want := expected[key]
 		if s, isString := want.(string); isString && s == "$absent" {
-			if got, present := target[key]; present && got != nil {
+			// Presence of the KEY is the failure. A decoded JSON null arrives
+			// here as nil, and treating that as absent would accept the exact
+			// mistake m1 exists to catch.
+			if got, present := target[key]; present {
 				return fmt.Sprintf("%s: expected the field to be absent, but it was %s", at, format(got))
 			}
 			continue
