@@ -16,8 +16,14 @@
 ## Running conformance
 
 ```bash
-go test ./conformance/ -v
+go test ./conformance/ -count=1
 ```
+
+**`-count=1` is not optional here.** Go's test cache hashes the package's own
+files, not `../../conformance/cases/*.json`, which live outside the module. Edit
+or add a case without touching Go code and plain `go test` answers
+`ok (cached)` without executing anything — a green that proved nothing about the
+case you just wrote.
 
 It reads the **same** cases as the TypeScript SDK, from `../conformance/cases`.
 Where the TypeScript runner is a CLI, this is a test — that is what a Go

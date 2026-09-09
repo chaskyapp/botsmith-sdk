@@ -51,6 +51,17 @@ cp .env.example .env    # then fill in the token, never export it on a command l
 | Go | `cd go && go run ./cmd/smoke` |
 | Python | `cd python && .venv/bin/python smoke.py` |
 
+## Running conformance
+
+| | Command |
+|---|---|
+| TypeScript | `cd js && npm run conformance` |
+| Go | `cd go && go test ./conformance/ -count=1` |
+| Python | `cd python && .venv/bin/python -m unittest conformance.test_conformance` |
+
+`-count=1` matters for Go: its test cache does not hash the shared case files,
+so without it a changed case can report `ok (cached)` having run nothing.
+
 Conformance proves an SDK against a fake that answers what the cases declare.
 The smoke tests prove the other half: that the cases describe the **real**
 server. A case written from a misreading of the spec passes conformance and

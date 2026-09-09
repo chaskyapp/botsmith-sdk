@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+// casesDir is outside this module, and Go's test cache does not hash it. Run
+// with -count=1 whenever a case changes, or a stale `ok (cached)` will report a
+// pass for a case that never ran. See go/README.md.
 const casesDir = "../../conformance/cases"
 
 func TestConformance(t *testing.T) {
