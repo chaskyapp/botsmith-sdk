@@ -1,10 +1,14 @@
-# SDK de Go
+# Go SDK
 
-**Entrega 2. Vacío: todavía no hay código.**
+**Delivery 2. Empty: no code yet.**
 
-- Módulo: `github.com/chaskyapp/bot-sdk/go`, `package chaskybot`.
-- Tags de release **con prefijo de subdirectorio**: `go/v0.1.0`, no `v0.1.0`.
-  Sin el prefijo, `go get` falla de forma confusa.
-- Nace mirando `reference/pepibot/`, **sin heredarlo**: pepibot corre contra
-  Chasky y Telegram a la vez, y ese es su valor. Ver §5.4 del contrato.
-- Contrato: [`../docs/00-spec.md`](../docs/00-spec.md)
+- Module: `github.com/chaskyapp/bot-sdk/go`, `package chaskybot`. The package name
+  does not match the directory on purpose — `package go` is not a thing.
+- Release tags carry the **subdirectory prefix**: `go/v0.1.0`, not `v0.1.0`.
+  Without the prefix, `go get` fails in a confusing way.
+- Shared internals live under `internal/`, so neither published package can reach
+  into the other.
+- It is written **looking at** `reference/pepibot/`, not derived from it: pepibot
+  runs against Chasky and Telegram at once, and that is its whole value. See §5.4
+  of the contract.
+- Contract: [`../docs/00-spec.md`](../docs/00-spec.md) *(in Spanish for now)*

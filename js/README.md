@@ -1,11 +1,17 @@
-# `@chasky/bot` — SDK de TypeScript
+# `@chasky/bot` — TypeScript SDK
 
-**Entrega 1. Vacío: todavía no hay código.**
+**Delivery 1. Empty: no code yet.**
 
-Se escribe en TypeScript y publica JS compilado + `.d.ts`. Los tipos son parte
-del contrato público, no documentación.
+Written in TypeScript, publishing compiled JS plus `.d.ts`. The types are **part
+of the public contract**, not documentation: half the traps this SDK exists to
+absorb are shape traps.
 
-- Contrato: [`../docs/00-spec.md`](../docs/00-spec.md)
-- Qué debe ser idéntico a los otros dos SDKs y qué no:
+Two packages ship from here — `@chasky/bot` (runtime, bot token) and
+`@chasky/botsmith` (management, human session + `X-Secret`). They are separate on
+purpose; see §6 of the contract. Whatever little they share lives in `core/`,
+which is **internal and never published**.
+
+- Contract: [`../docs/00-spec.md`](../docs/00-spec.md) *(in Spanish for now)*
+- What must be identical across the three SDKs and what must not:
   [`../docs/01-organizacion.md`](../docs/01-organizacion.md) §3
-- No se escribe nada hasta cerrar D5–D8 y D10–D11 del §12 del contrato.
+- No code until D5, D7, D8, D10 and D11 in §12 of the contract are closed.

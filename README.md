@@ -1,57 +1,59 @@
-# bot-sdk — SDKs cliente de la Bot API de Chasky
+# bot-sdk — Client SDKs for the Chasky Bot API
 
-**Estado: especificación. Todavía no hay código en ningún lenguaje.**
+**Status: specification. No code yet, in any language.**
 
-Monorepo de los SDKs que un autor de bot instala en su proyecto para hablar con
-la Bot API de Chasky, en el lugar que `telegraf` o `python-telegram-bot` ocupan
-para Telegram.
+Monorepo for the SDKs a bot author installs to talk to the Chasky Bot API —
+filling the role `telegraf` and `python-telegram-bot` fill for Telegram.
 
-Vive **fuera** de `backend-api-go` a propósito: el SDD scopeó el consumidor
-externo fuera del repo del servidor, y meterlo adentro contaminaría la API con
-decisiones que le corresponden a cada autor de bot.
+It deliberately lives **outside** `backend-api-go`: the SDD scoped the external
+consumer out of the server repo, and pulling it in would contaminate the API with
+decisions that belong to each bot author.
 
-## Los tres SDKs
+## The three SDKs
 
-| Entrega | Lenguaje | Paquete | Estado |
+| Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/bot` | [`js/`](js/) — vacío |
-| 2 | Go | `github.com/chaskyapp/bot-sdk/go` | [`go/`](go/) — vacío |
-| 3 | Python | `chasky-bot` | [`python/`](python/) — vacío |
+| 1 | TypeScript | `@chasky/bot` | [`js/`](js/) — empty |
+| 2 | Go | `github.com/chaskyapp/bot-sdk/go` | [`go/`](go/) — empty |
+| 3 | Python | `chasky-bot` | [`python/`](python/) — empty |
 
-El orden es TypeScript → Go → Python, y el motivo está en el §5 del contrato:
-**la suite de conformidad no prueba nada con un solo consumidor**, y Go es el
-segundo puerto más barato porque el equipo ya lo escribe y `pepibot` ya existe.
+The order is TypeScript → Go → Python. The reason is in §5 of the contract: **a
+conformance suite proves nothing with a single consumer**, and Go is the cheapest
+second port because the team already writes it and `pepibot` already exists.
 
-## Por dónde empezar
+## Where to start
 
-- **[docs/00-spec.md](docs/00-spec.md)** — el contrato: propósito, superficie,
-  semánticas garantizadas y delegadas, identificadores, errores y redacción,
-  decisiones y pedidos al servidor.
-- **[docs/01-organizacion.md](docs/01-organizacion.md)** — cómo se sostiene ese
-  contrato en tres implementaciones sin que se desincronicen: layout, qué es
-  invariante y qué idiomático, suite de conformidad, versionado, orden de trabajo.
-- **[conformance/](conformance/)** — la suite que convierte las garantías en
-  tests que fallan. Se escribe **antes** que cualquier SDK.
+- **[docs/00-spec.md](docs/00-spec.md)** — the contract: purpose, surface,
+  guaranteed and delegated semantics, identifiers, errors and redaction,
+  decisions, and requests to the server.
+- **[docs/01-organizacion.md](docs/01-organizacion.md)** — how that contract
+  survives three implementations without drifting: layout, what is invariant and
+  what is idiomatic, conformance suite, versioning, work order.
+- **[conformance/](conformance/)** — the suite that turns the guarantees into
+  failing tests. It gets written **before** any SDK.
 
-## Lo más importante, en tres líneas
+> **Note:** `docs/` is currently written in Spanish. Everything published —code,
+> comments, error messages, these READMEs— is English. The specs get translated
+> once the open decisions close (D12).
 
-1. **Un solo proceso por bot, y arrancar desplaza al que estaba.** Desde el
-   2026-09-08 el servidor devuelve `409 CONFLICT_POLLING` y el poll **viejo** es
-   el que muere. El SDK se detiene ante un `409` y **no reintenta**: reintentar
-   mete a dos instancias en una guerra de expulsiones. Perder el poll no pierde
-   mensajes.
-2. **El offset avanza siempre**, aunque el handler falle. Es un cursor de
-   lectura, no un ack de negocio.
-3. **El token viaja en la ruta** y se filtra a los logs por el transporte. Todo
-   error que sale del SDK viene redactado.
+## The three things that matter most
 
-## Antes de escribir código
+1. **One process per bot, and starting up displaces whoever was there.** Since
+   2026-09-08 the server returns `409 CONFLICT_POLLING`, and it is the **old**
+   poll that dies. The SDK stops on a `409` and **never retries**: retrying puts
+   two instances into an eviction war. Losing the poll does not lose messages.
+2. **The offset always advances**, even when the handler fails. It is a read
+   cursor, not a business acknowledgement.
+3. **The token travels in the path** and leaks into logs through the transport.
+   Every error leaving the SDK is redacted.
 
-Quedan **seis decisiones abiertas** en el §12 del contrato. D6 —la ventana de
-deduplicación— es bloqueante: cambia la estructura de datos del núcleo en los
-tres SDKs, y se resuelve verificando si el PEL de Redis puede reentregar fuera de
-orden.
+## Before writing code
 
-Los paquetes se llaman `@chasky/bot` y `@chasky/botsmith` en npm (scope
-confirmado disponible), y el mismo estándar —identidad `chasky` + rol en una
-palabra— se traslada a Go y a PyPI.
+**Six decisions are still open** in §12 of the contract. None of them blocks any
+more: D6 —the deduplication strategy— was the blocking one and closed on
+2026-09-08, verified against the server code. It resolves to a single integer
+threshold, not a data structure.
+
+Packages are `@chasky/bot` and `@chasky/botsmith` on npm (scope confirmed
+available), and the same standard —the `chasky` identity plus the role in one
+word— carries over to Go and PyPI.

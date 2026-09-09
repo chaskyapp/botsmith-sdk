@@ -1,12 +1,15 @@
-# `chasky-bot` — SDK de Python
+# `chasky-bot` — Python SDK
 
-**Entrega 3. Vacío: todavía no hay código.**
+**Delivery 3. Empty: no code yet.**
 
-Llega tercero y con el contrato ya sacudido por dos implementaciones: es el más
-barato de los tres.
+It arrives last, with the contract already shaken out by two implementations —
+which makes it the cheapest of the three, not the least important.
 
-**No transliterar el SDK de TypeScript.** `asyncio`, `snake_case`, excepciones y
-decoradores (`@bot.on_text`). Un SDK de Python que parece TypeScript es un mal
-SDK de Python — ver §3 de [`../docs/01-organizacion.md`](../docs/01-organizacion.md).
+**Do not transliterate the TypeScript SDK.** Use `asyncio`, `snake_case`,
+exceptions, and decorators (`@bot.on_text`). A Python SDK that reads like
+TypeScript is a bad Python SDK — see §3 of
+[`../docs/01-organizacion.md`](../docs/01-organizacion.md).
 
-- Contrato: [`../docs/00-spec.md`](../docs/00-spec.md)
+Shared internals go in `_core/`, private by convention.
+
+- Contract: [`../docs/00-spec.md`](../docs/00-spec.md) *(in Spanish for now)*

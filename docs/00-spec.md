@@ -578,10 +578,13 @@ que hay que leer entera antes de escribir un bot.
   lote **recibido**, y se manda en el poll siguiente pase lo que pase con los
   handlers: excepción, timeout, rechazo, update ya visto. El avance es del
   transporte, no del negocio.
-- **G3 — Dedup por `update_id`, con ventana acotada.** pepibot usa un `map` que
-  crece para siempre; en un proceso que vive meses eso es una fuga. El SDK usa
-  una ventana finita, dimensionada con la garantía del servidor de que los
-  `update_id` son monótonos por bot (§12, D6).
+- **G3 — Dedup por `update_id`, con un umbral.** Se descarta todo
+  `update_id <= lastSeen`, y `lastSeen` es **un solo entero**: no hace falta
+  ninguna estructura de datos. El servidor entrega en orden ascendente estricto y
+  no emite identificadores regresivos, así que un `update_id` por debajo del
+  umbral es **siempre** un duplicado (D6, §12 — verificado contra el código).
+  pepibot usa un `map` que crece para siempre; en un proceso que vive meses eso
+  es una fuga, y el umbral la elimina de raíz.
 - **G4 — `Idempotency-Key` administrada.** Una key nueva por mensaje lógico, la
   **misma** en cada reintento interno de ese envío. El autor nunca la escribe ni
   la ve. Si la fuente de aleatoriedad falla, **no se envía**: mandar sin key es
@@ -766,17 +769,48 @@ de código.
 | **D2** | ¿Compatible con Telegram o nativo? | **Nativo**, con el modelo mental de Telegram | Los ids son string vs número; toda coerción es error silencioso. §4 |
 | **D3** | Superficie | **Dos paquetes por lenguaje**; runtime primero, gestión después | Envelopes incompatibles y un `409` que significa lo opuesto en cada superficie; y un paquete único hace *escribible* mandar el `X-Secret` desde el proceso del bot. §6 |
 | **D4** | Webhook | **Seam de transporte, sin comprometer forma** | El servidor no lo construyó todavía. §11 |
+| **D6** | Dedup por `update_id` | **Umbral `> lastSeen`**: un entero, sin estructura de datos | Verificado en el código (abajo). Es más barato **y** más correcto que una ventana finita |
 | **D9** | Layout y nombres | **Monorepo `bot-sdk`**, un directorio por lenguaje en la raíz; scope npm **`@chasky/`** confirmado disponible | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
+
+#### Verificación de D6 (2026-09-08)
+
+Leído en `internal/core/botapi/infrastructure/redis/`, rama `cc-jose-nieto/botapi`:
+
+1. **`producer.go`** — el `XADD` del script Lua usa un **stream ID explícito**
+   igual a `<update_id>-0`, así que **el orden del stream es el orden de
+   `update_id`**. El script además compara contra el último ID del stream y
+   aborta antes que emitir uno regresivo: hay **gaps válidos, nunca IDs hacia
+   atrás**.
+2. **`updates.go`** — el lector recorre primero el **PEL** (`XREADGROUP` desde
+   `"0"`, con el cursor avanzando por `entry.ID`) y recién después las **nuevas**
+   (`">"`), que por construcción tienen IDs mayores que cualquier pendiente.
+
+De ahí sale que **cada respuesta llega en orden ascendente estricto**, y que entre
+respuestas también lo está mientras el offset avance (G2). La única fuente de
+repetición es una re-entrega del PEL, y siempre trae `update_id <= lastSeen`.
+
+**El umbral no filtra de más**: sin identificadores regresivos, un `update_id` por
+debajo del umbral es siempre un duplicado.
+
+**Y es más correcto que una ventana finita.** Si el consumer group se recrea
+—camino `NOGROUP` del propio lector— el last-delivered-id vuelve a cero y se
+re-entrega **el stream entero**. Una ventana de N=1000 reprocesa todo lo anterior
+a esas mil entradas; el umbral no se inmuta. Se elige por correctitud; que además
+sea un entero en vez de una estructura es el bonus.
+
+*Alcance*: el umbral vale **dentro de la vida del proceso**. Al reiniciar,
+`lastSeen` arranca en cero y el PEL se reprocesa — eso es **D7**, no D6, y es el
+default documentado en L2.
 
 ### Abiertas
 
 | # | Decisión | Recomendación | Qué falta |
 |---|---|---|---|
 | **D5** | Destino de pepibot | **Cliente de conformidad** en `reference/pepibot/`, no semilla de `sdk/go` | Es el único cliente que corre contra las dos plataformas; el SDK de Go pierde esa capacidad. ¿Lo movemos, o lo dejás en `~/Desktop`? |
-| **D6** | Ventana de dedup | Umbral simple `> lastSeen`, si el PEL no reentrega fuera de orden | **Bloqueante y verificable**: hay que leer `updates.go` contra Redis real. Si reentrega en orden, el umbral ahorra la estructura entera en los tres SDKs |
 | **D7** | Persistencia del offset | Gancho `OffsetStore` **opcional**, default en memoria | Un default con disco sorprende; uno con memoria reprocesa al reiniciar. Se elige reprocesar y documentarlo. ¿De acuerdo? |
 | **D8** | `http://` no local | **Advertir**, no negarse | Negarse rompe staging interno legítimo. ¿Preferís que se niegue y haya que optar explícitamente? |
 | **D10** | Formato de la suite de conformidad | Casos declarativos **JSON** contra un servidor fake por lenguaje | Alternativa: un único binario de conformidad que hospeda el fake y los tres SDKs corren contra él por HTTP. Más fiel, más caro. §6 de `01-organizacion.md` |
+| **D12** | Traducir `docs/` al inglés | **Sí, cuando cierren D5, D7, D8, D10 y D11.** Incluye renombrar `01-organizacion.md` → `01-organization.md` y los enlaces que lo apuntan | Cerrada en cuanto al *qué*; abierta como **tarea pendiente con disparador**. Está en esta lista a propósito: un paso pendiente que no se cuenta es un paso que se olvida |
 | **D11** | Versionado de los tres paquetes | **Independiente**, con la versión del contrato declarada aparte | Alternativa: versión única sincronizada. Es más simple de explicar y obliga a releases vacíos. `01-organizacion.md` |
 
 ---

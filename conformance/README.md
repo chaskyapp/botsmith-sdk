@@ -1,19 +1,23 @@
-# Suite de conformidad
+# Conformance suite
 
-**Vacío: todavía no hay casos.** Es lo primero que se escribe, antes que
-cualquier SDK.
+**Empty: no cases yet.** This is the first thing that gets written, before any
+SDK.
 
-Los casos de `cases/` son la **fuente de verdad ejecutable** del contrato:
-convierten las garantías G1–G9 del §8 en tests que fallan. Cada SDK trae su
-propio runner; **los casos son compartidos**.
+The cases under `cases/` are the **executable source of truth** for the contract:
+they turn guarantees G1–G9 (§8) into tests that fail. Each SDK brings its own
+runner; **the cases are shared**.
 
-## La regla
+## The rule
 
-> Un cambio de comportamiento se escribe primero como caso, y recién después se
-> implementa.
+> A behaviour change is written as a case first, and implemented second.
 
-Un caso que solo pasa en un lenguaje es un caso mal escrito o un bug en los
-otros. Nunca es "así funciona en ese lenguaje".
+A case that only passes in one language is either a badly written case or a bug
+in the other two. It is never "that's how it works in that language."
 
-Detalle y lista de casos prioritarios:
-[`../docs/01-organizacion.md`](../docs/01-organizacion.md) §4.
+And the uncomfortable corollary, worth accepting up front: when the Go SDK lands
+and a case fails, **the first hypothesis is that the case is wrong**, not Go.
+Cases born from a single implementation describe that implementation. That shakeout
+is exactly why Go ships second.
+
+Details and the priority case list:
+[`../docs/01-organizacion.md`](../docs/01-organizacion.md) §4 *(in Spanish for now)*.

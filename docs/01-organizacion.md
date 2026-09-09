@@ -124,6 +124,39 @@ cuáles devuelve.
 
 ---
 
+## 3 bis. Idioma
+
+**Todo lo que se publica está en inglés.** Sin excepción y sin discusión: el
+público del SDK es internacional, y un paquete en npm o PyPI con comentarios en
+español es indefendible.
+
+En inglés, ya:
+
+- Código: identificadores, tipos, funciones, opciones de la API pública.
+- Comentarios de código.
+- Mensajes de error del SDK — todo lo que lee el autor del bot.
+- Los `README.md` de `js/`, `go/`, `python/`, `conformance/`, `reference/` y la
+  raíz.
+- Los casos de conformidad: nombres, descripciones, mensajes de fallo.
+- Los mensajes de commit, desde el 2026-09-08. Los tres anteriores quedan como
+  están: reescribir la historia cuesta más de lo que vale.
+
+En español, **por ahora**:
+
+- `docs/00-spec.md` y este documento, mientras queden decisiones abiertas. Son la
+  conversación de diseño con el equipo, y en español se leen más rápido.
+
+Eso se traduce entero —incluido el nombre de este archivo— cuando cierren D5, D7,
+D8, D10 y D11. Está anotado como **D12** en el §12 del contrato, y no como un
+`TODO` suelto, justamente para que se cuente entre lo que falta en vez de
+evaporarse.
+
+**Regla para dirimir dudas**: si lo lee alguien que no está en el equipo, va en
+inglés. Un `README` de paquete lo lee un tercero; un spec con decisiones abiertas
+lo leemos nosotros.
+
+---
+
 ## 4. La suite de conformidad
 
 Es el mecanismo que hace que "tres SDKs" no sea "tres productos". Sin esto, el
@@ -143,6 +176,9 @@ porque son las que un puerto apurado rompe:
   el siguiente poll manda `offset: 8`. **G2.** Es el caso que más fácil se rompe,
   porque "solo confirmo lo que procesé bien" suena a lo correcto.
 - El servidor reentrega el update 6 → el handler corre **una sola vez**. **G3.**
+- El consumer group se recrea y el servidor reentrega **el stream entero** →
+  ningún handler vuelve a correr. **G3.** Es el caso que distingue un umbral de
+  una ventana finita: la ventana falla acá (D6, §12 del contrato).
 - Dos `sendMessage` lógicamente distintos → **dos** `Idempotency-Key` distintas.
   **G4.** Y el reintento del primero → la **misma** key.
 - El transporte falla con un error que contiene la URL → el error que sale del
