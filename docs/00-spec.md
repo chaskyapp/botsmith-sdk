@@ -256,42 +256,64 @@ Eso es el 80% del beneficio de portar, sin nada de la ficción de tipos.
 
 ---
 
-## 5. Decisión — lenguaje
+## 5. Decisión — los tres SDKs y su orden
 
-**Recomendación: TypeScript/Node primero. Go segundo.**
+**CERRADA (2026-09-08): se hacen tres — TypeScript, Go y Python — en un monorepo,
+y el orden de entrega es TypeScript → Go → Python.**
 
-El razonamiento no es "TS es mejor", es **dónde el SDK vale más**:
+### 5.1 Por qué TypeScript primero
 
 1. **El público del SDK no es el equipo del backend.** Son terceros que escriben
-   bots. Las referencias que el usuario mismo nombró —`python-telegram-bot`,
-   `telegraf`— son Python y JS. No hay un SDK de Go de Telegram que ocupe ese
-   lugar en la cabeza de nadie.
-
-2. **El valor marginal del SDK es mayor en JS que en Go, y pepibot lo prueba.**
-   Hoy un autor de Go puede hablar con Chasky en 554 líneas de biblioteca
-   estándar, sin una sola dependencia, y ya existe el archivo que lo demuestra.
-   El autor de JS enfrenta las mismas 554 líneas **más** el trabajo de descubrir
-   solo las seis trampas del §3. El hueco a tapar es más grande del lado de JS.
-
-3. **El resto del producto ya es JS.** El frontend es Next.js; el portal
-   enterprise también. Un `@chasky/bot` se instala y se despliega en el mismo
+   bots. Las referencias del rubro —`telegraf`, `python-telegram-bot`— son JS y
+   Python.
+2. **El valor marginal es mayor en JS, y pepibot lo prueba.** Hoy un autor de Go
+   habla con Chasky en 554 líneas de biblioteca estándar, sin una dependencia, y
+   el archivo que lo demuestra ya existe. El autor de JS enfrenta esas mismas 554
+   líneas **más** el trabajo de descubrir solo las seis trampas del §3.
+3. **El resto del producto ya es JS.** Frontend Next.js, portal enterprise. Mismo
    toolchain que el equipo ya opera.
+4. **El futuro webhook es Node.** Cuando exista egreso de webhooks (§11), el
+   handler HTTP del bot va a vivir mayoritariamente en un runtime serverless.
 
-4. **El futuro webhook es Node.** Cuando exista egreso de webhooks (§10), el
-   handler HTTP del bot va a vivir mayoritariamente en un runtime serverless, y
-   ese terreno es de Node.
+Y una precisión que no es cosmética: se escribe **en TypeScript**, y los `.d.ts`
+publicados son **parte del contrato público**, no documentación. Que
+`sendChatAction({ action: "upload_photo" })` falle en el editor y no con un `400
+ACTION_NOT_SUPPORTED` en producción es la mitad del valor del SDK, porque la
+mitad de las trampas del §3 son de forma.
 
-**Contraargumento honesto, y por qué no gana:** el servidor es Go, y un SDK en Go
-lo mantendría el mismo equipo sin cambiar de contexto, con tests de contrato
-contra un servidor local en un solo toolchain. Es un argumento de
-**mantenimiento**, real, y pierde contra uno de **adopción**: el SDK existe para
-gente que no está en el repo del servidor.
+### 5.2 Por qué Go segundo
 
-**Rol de pepibot en el plan:** no se descarta y no se promueve a producto. Queda
-como **cliente de conformidad** —la implementación de referencia mínima, en
-stdlib, que verifica el contrato del servidor de punta a punta— y se mueve a
-`reference/pepibot/` de este repo. Un SDK de Go se considera después, con el
-contrato ya estabilizado por el de TS.
+El argumento de adopción favorecía a Python —no tiene nada hoy, y los bots con
+LLM son casi todos Python—. Gana un argumento más urgente: **la suite de
+conformidad (§6) no prueba nada con un solo consumidor.**
+
+Una suite corrida por una sola implementación no valida el contrato: valida esa
+implementación contra sí misma. Recién con el **segundo** puerto aparecen los
+casos donde la suite era ambigua, donde el "contrato" era en realidad un detalle
+de cómo lo hizo el primero, y donde una garantía estaba escrita en prosa que
+admitía dos lecturas.
+
+Go llega segundo antes que Python porque **la mitad del trabajo ya está escrita**
+en pepibot y porque lo mantiene el mismo equipo que el servidor, sin cambiar de
+contexto. Es el segundo puerto más barato, y el segundo puerto es el que
+convierte la conformidad en algo real.
+
+### 5.3 Por qué Python tercero
+
+Es el que más adopción trae y el que menos riesgo de contrato corre, porque llega
+con el contrato ya sacudido por dos implementaciones. Llegar tercero no lo
+degrada: lo hace el más barato de los tres.
+
+### 5.4 Rol de pepibot
+
+**No se promueve a `sdk/go` y no se degrada a ejemplo.** Su función es distinta
+de la de un SDK: es el único cliente que corre contra **Chasky y Telegram a la
+vez**, y esa comparación es lo que hace visibles las diferencias del §4. Un SDK
+nativo de Chasky pierde exactamente esa capacidad.
+
+Queda en `reference/pepibot/` como **cliente de conformidad**: la implementación
+mínima en stdlib que verifica el contrato del servidor de punta a punta. El SDK
+de Go nace mirándolo, no siendo él (D5, §12).
 
 ---
 
@@ -299,12 +321,12 @@ contrato ya estabilizado por el de TS.
 
 **Recomendación: dos paquetes, y solo el primero en la primera entrega.**
 
-### `@chasky/bot` — runtime del bot (primera entrega)
+### Paquete 1 — runtime del bot (primera entrega)
 
 Credencial: el token, en la ruta. Superficie: `getMe`, `getUpdates`,
 `sendMessage`, `sendChatAction`, más todo el andamiaje del §7.
 
-### `@chasky/botsmith` — gestión (después, y solo si hay demanda)
+### Paquete 2 — gestión (después, y solo si hay demanda)
 
 Credencial: **sesión humana + `X-Secret`**. Superficie: los seis endpoints de
 `/bot-management`.
@@ -327,12 +349,28 @@ vez**, a mano, en el portal. La automatización por código sirve para un caso
 concreto —CI que provisiona bots por entorno— y hasta que ese caso exista es
 superficie que se mantiene sin usarse.
 
+### Nombres por ecosistema
+
+Los dos paquetes existen en los tres lenguajes, con el nombre que cada ecosistema
+espera. El nombre cambia; la separación de credenciales no.
+
+| | Runtime | Gestión |
+|---|---|---|
+| npm | `@chasky/bot` | `@chasky/botsmith` |
+| Go | `github.com/chaskyapp/bot-sdk/go` (`package chaskybot`) | `.../bot-sdk/go/botsmith` |
+| PyPI | `chasky-bot` | `chasky-botsmith` |
+
 ---
 
 ## 7. Superficie de la API del SDK
 
 Boceto de contrato, no implementación: firmas y tipos, sin cuerpos. Sirve para
 discutir la forma; los nombres finales se cierran junto con el §12.
+
+Está escrito en TypeScript porque es la primera entrega (§5). **Go y Python NO lo
+transliteran**: portan los invariantes y adoptan la forma de su ecosistema. Qué
+es invariante y qué es idiomático está en `01-organizacion.md` §3, y es la regla
+que impide que el SDK de Python parezca TypeScript mal traducido.
 
 ### 7.1 Tipos del dominio
 
@@ -590,22 +628,32 @@ del servidor:
 
 ---
 
-## 12. Decisiones abiertas
+## 12. Decisiones
 
-Las cinco primeras son de fondo y están recomendadas arriba; se repiten acá para
-que se puedan aprobar o rechazar de una.
+Las cerradas están cerradas: se aplican, no se rediscuten salvo que aparezca
+evidencia nueva. Las abiertas necesitan una respuesta antes de la primera línea
+de código.
 
-| # | Decisión | Recomendación | Fundamento |
+### Cerradas
+
+| # | Decisión | Resolución | Fundamento |
 |---|---|---|---|
-| **D1** | Lenguaje de la primera entrega | **TypeScript/Node** (`@chasky/bot`) | El público son terceros, y el hueco es mayor en JS: en Go pepibot ya prueba que se puede con stdlib. §5 |
+| **D1** | Lenguajes y orden | **TS → Go → Python**, los tres | El segundo puerto es el que valida la conformidad; Go es el segundo más barato. §5 |
 | **D2** | ¿Compatible con Telegram o nativo? | **Nativo**, con el modelo mental de Telegram | Los ids son string vs número; toda coerción es error silencioso. §4 |
-| **D3** | Superficie | **Dos paquetes**; `@chasky/bot` primero, `@chasky/botsmith` después | Credenciales distintas: un solo paquete invita a mandar el `X-Secret` desde el proceso del bot. §6 |
+| **D3** | Superficie | **Dos paquetes por lenguaje**; runtime primero, gestión después | Credenciales distintas: un paquete único hace *escribible* mandar el `X-Secret` desde el proceso del bot. §6 |
 | **D4** | Webhook | **Seam de transporte, sin comprometer forma** | El servidor no lo construyó todavía. §11 |
-| **D5** | Destino de pepibot | **Cliente de conformidad** en `reference/pepibot/`, no producto | Es la prueba viva del contrato; degradarlo a ejemplo pierde esa función |
-| **D6** | Tamaño de la ventana de dedup | Ventana de los últimos **N=1000** `update_id`, o solo `> lastSeen` | El `update_id` es monótono por bot, así que un umbral simple podría alcanzar y evitaría la estructura entera. **Preguntar**: ¿alcanza el umbral, o hay reentregas fuera de orden? |
-| **D7** | Persistencia del offset | Gancho `OffsetStore` **opcional**, default en memoria | Un default con disco sorprende; uno con memoria reprocesa. Se elige reprocesar y documentarlo |
-| **D8** | `http://` no local | **Advertir**, no negarse | Negarse rompe entornos de staging internos legítimos. Abierto: ¿preferís que se niegue y haya que optar explícitamente? |
-| **D9** | Nombre y scope del paquete | `@chasky/bot` y `@chasky/botsmith`; repo `bot-sdk` | Sigue la convención de los repos hermanos, que no llevan prefijo `chasky-` |
+| **D9** | Layout y nombres | **Monorepo `bot-sdk`**, un directorio por lenguaje en la raíz | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
+
+### Abiertas
+
+| # | Decisión | Recomendación | Qué falta |
+|---|---|---|---|
+| **D5** | Destino de pepibot | **Cliente de conformidad** en `reference/pepibot/`, no semilla de `sdk/go` | Es el único cliente que corre contra las dos plataformas; el SDK de Go pierde esa capacidad. ¿Lo movemos, o lo dejás en `~/Desktop`? |
+| **D6** | Ventana de dedup | Umbral simple `> lastSeen`, si el PEL no reentrega fuera de orden | **Bloqueante y verificable**: hay que leer `updates.go` contra Redis real. Si reentrega en orden, el umbral ahorra la estructura entera en los tres SDKs |
+| **D7** | Persistencia del offset | Gancho `OffsetStore` **opcional**, default en memoria | Un default con disco sorprende; uno con memoria reprocesa al reiniciar. Se elige reprocesar y documentarlo. ¿De acuerdo? |
+| **D8** | `http://` no local | **Advertir**, no negarse | Negarse rompe staging interno legítimo. ¿Preferís que se niegue y haya que optar explícitamente? |
+| **D10** | Formato de la suite de conformidad | Casos declarativos **JSON** contra un servidor fake por lenguaje | Alternativa: un único binario de conformidad que hospeda el fake y los tres SDKs corren contra él por HTTP. Más fiel, más caro. §6 de `01-organizacion.md` |
+| **D11** | Versionado de los tres paquetes | **Independiente**, con la versión del contrato declarada aparte | Alternativa: versión única sincronizada. Es más simple de explicar y obliga a releases vacíos. `01-organizacion.md` |
 
 ---
 
