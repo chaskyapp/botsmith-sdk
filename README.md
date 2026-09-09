@@ -15,7 +15,7 @@ decisions that belong to each bot author.
 |---|---|---|---|
 | 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — runtime done, 11/11 conformance |
 | 2 | Go | `github.com/chaskyapp/botsmith-sdk/go` | [`go/`](go/) — empty |
-| 3 | Python | `chasky-bot` | [`python/`](python/) — empty |
+| 3 | Python | `chasky-botsmith` | [`python/`](python/) — empty |
 
 The order is TypeScript → Go → Python. The reason is in §5 of the contract: **a
 conformance suite proves nothing with a single consumer**, and Go is the cheapest

@@ -1,4 +1,4 @@
-# `chasky-bot` — Python SDK
+# `chasky-botsmith` — Python SDK
 
 **Delivery 3. Empty: no code yet.**
 
