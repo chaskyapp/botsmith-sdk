@@ -1,0 +1,36 @@
+{
+  "id": "g7-409-stops-and-sends-nothing-more",
+  "contractVersion": "1.0",
+  "guarantee": "G7",
+  "title": "A 409 CONFLICT_POLLING stops the bot and produces not one further request",
+  "why": "Cheapest to break, most expensive to diagnose. A client's reflex is to retry anything that looks transient, and two retrying instances enter an EVICTION WAR: each displaces the other and neither processes anything. That is worse than the silent split the server's 409 was introduced to fix. The exhaustive exchange list is the assertion — any request after the 409 fails this case, which is why 'reported the error' is not enough on its own.",
+
+  "bot": {
+    "transport": "polling",
+    "options": { "limit": 50, "timeoutSeconds": 25 },
+    "handler": { "kind": "reply" }
+  },
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [
+        { "update_id": 5, "message": { "message_id": "m5", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376000, "text": "five" } }
+      ] } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/sendMessage", "body": { "text": "five" } },
+      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r5", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376001, "text": "five" } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 6 } },
+      "respond": { "status": 409, "body": { "ok": false, "error_code": 409, "description": "CONFLICT_POLLING" } }
+    }
+  ],
+
+  "assert": {
+    "botStopped": true,
+    "errorsReported": [ { "code": 409, "notContains": "{token}" } ]
+  },
+  "run": { "timeoutMs": 3000 }
+}

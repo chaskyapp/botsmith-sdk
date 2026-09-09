@@ -1,0 +1,26 @@
+{
+  "id": "g7-401-stops-the-bot",
+  "contractVersion": "1.0",
+  "guarantee": "G7",
+  "title": "A 401 stops the bot instead of retrying forever",
+  "why": "A revoked or invalid token never becomes valid by retrying. Without a hard stop the bot hammers the API forever and the author sees an endless error log with no signal about what to fix.",
+
+  "bot": {
+    "transport": "polling",
+    "options": { "limit": 50, "timeoutSeconds": 25 },
+    "handler": { "kind": "reply" }
+  },
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
+      "respond": { "status": 401, "body": { "ok": false, "error_code": 401, "description": "TOKEN_INVALID" } }
+    }
+  ],
+
+  "assert": {
+    "botStopped": true,
+    "errorsReported": [ { "code": 401, "notContains": "{token}" } ]
+  },
+  "run": { "timeoutMs": 3000 }
+}

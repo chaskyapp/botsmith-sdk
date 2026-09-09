@@ -1,0 +1,27 @@
+{
+  "id": "g6-timeout-clamped-to-server-maximum",
+  "contractVersion": "1.0",
+  "guarantee": "G6",
+  "title": "A timeout above the server maximum is clamped, not sent as-is",
+  "why": "The server clamps silently on its own, but values it rejects outright turn into a 400. A reasonable-looking `timeoutSeconds: 60` should not become an error the author has to decode. The SDK clamps and says so, rather than spending a request to find out.",
+
+  "bot": {
+    "transport": "polling",
+    "options": { "limit": 50, "timeoutSeconds": 60 },
+    "handler": { "kind": "noop" }
+  },
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates",
+                  "body": { "offset": 0, "timeout": 30 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+    }
+  ],
+
+  "assert": {
+    "botStopped": false,
+    "warnings": [ { "contains": "clamped" } ]
+  },
+  "run": { "timeoutMs": 3000 }
+}

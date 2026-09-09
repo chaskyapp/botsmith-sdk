@@ -1,0 +1,30 @@
+{
+  "id": "g5-transport-error-does-not-leak-the-token",
+  "contractVersion": "1.0",
+  "guarantee": "G5",
+  "title": "A transport error carrying the URL reaches the author without the token",
+  "why": "The token travels in the path, so the HTTP client embeds the full URL in its OWN errors. A plain 'connection refused' is enough to write the credential into a log. Nobody has to log carelessly — logging the error is enough. The author cannot defend against this because they do not know the error has a URL inside.",
+
+  "bot": {
+    "transport": "polling",
+    "options": { "limit": 50, "timeoutSeconds": 25 },
+    "handler": { "kind": "reply" }
+  },
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
+      "respond": { "transportError": "dial tcp: connection refused: {url}" }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+    }
+  ],
+
+  "assert": {
+    "botStopped": false,
+    "errorsReported": [ { "notContains": "{token}" } ]
+  },
+  "run": { "timeoutMs": 5000 }
+}

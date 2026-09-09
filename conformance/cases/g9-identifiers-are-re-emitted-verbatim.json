@@ -1,0 +1,34 @@
+{
+  "id": "g9-identifiers-are-re-emitted-verbatim",
+  "contractVersion": "1.0",
+  "guarantee": "G9",
+  "title": "A chat id is sent back exactly as received, never coerced",
+  "why": "Chasky ids are strings and Telegram's are numbers. Any coercion is a SILENT error: it throws nothing, it just addresses the wrong chat or none at all. The id here is deliberately all digits — the shape most likely to tempt a JSON layer, or a porting author, into turning it into a number.",
+
+  "bot": {
+    "transport": "polling",
+    "options": { "limit": 50, "timeoutSeconds": 25 },
+    "handler": { "kind": "reply" }
+  },
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [
+        { "update_id": 5, "message": { "message_id": "0042", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "900719925474099111", "type": "private" }, "date": 1757376000, "text": "five" } }
+      ] } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/sendMessage",
+                  "body": { "chat_id": "900719925474099111", "text": "five" } },
+      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r5", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "900719925474099111", "type": "private" }, "date": 1757376001, "text": "five" } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 6 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+    }
+  ],
+
+  "assert": { "botStopped": false },
+  "run": { "timeoutMs": 3000 }
+}

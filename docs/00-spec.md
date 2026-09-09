@@ -536,6 +536,13 @@ await bot.stop();                            // cuts the in-flight long poll
 shortcuts `reply` (a `sendMessage` to the update's chat, with a managed
 `Idempotency-Key`) and `typing`.
 
+**The runtime never sends `sendChatAction` on its own.** Typing is a product
+decision — whether it helps depends on how long the bot takes to answer — so the
+author calls `ctx.typing()` when they want it. Sending it automatically would
+double every bot's request count, including bots that answer in five milliseconds
+where the indicator is just flicker. pepibot sends it before every reply; that is
+a choice its author made, not a behaviour to inherit.
+
 **A domain detail the SDK must reflect:** a bot **cannot start** a conversation.
 It can only reply in a chat it already knows, because the conversation is created
 by the human opener (`POST /bots/{botID}/conversation`). The `chatId` is learned

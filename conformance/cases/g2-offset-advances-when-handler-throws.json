@@ -1,0 +1,50 @@
+{
+  "id": "g2-offset-advances-when-handler-throws",
+  "contractVersion": "1.0",
+  "guarantee": "G2",
+  "title": "The offset advances past an update whose handler threw",
+  "why": "If the offset only advances on success, the bot gets stuck retrying update 6 forever and never sees anything behind it. This is the trap most often written by hand, because 'I only acknowledge what I processed correctly' sounds right.",
+
+  "bot": {
+    "transport": "polling",
+    "options": { "limit": 50, "timeoutSeconds": 25 },
+    "handler": { "kind": "reply", "throwOnUpdateIds": [6] }
+  },
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates",
+                  "body": { "offset": 0, "limit": 50, "timeout": 25 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [
+        { "update_id": 5, "message": { "message_id": "m5", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376000, "text": "five" } },
+        { "update_id": 6, "message": { "message_id": "m6", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376001, "text": "six" } },
+        { "update_id": 7, "message": { "message_id": "m7", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376002, "text": "seven" } }
+      ] } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/sendMessage",
+                  "body": { "chat_id": "bot:b1:u1", "text": "five" } },
+      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r5", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376003, "text": "five" } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/sendMessage",
+                  "body": { "chat_id": "bot:b1:u1", "text": "seven" } },
+      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r7", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376004, "text": "seven" } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates",
+                  "body": { "offset": 8 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+    }
+  ],
+
+  "assert": {
+    "botStopped": false,
+    "handlerRuns": [
+      { "updateId": 5, "times": 1 },
+      { "updateId": 6, "times": 1 },
+      { "updateId": 7, "times": 1 }
+    ]
+  },
+  "run": { "timeoutMs": 3000 }
+}
