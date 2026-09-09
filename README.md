@@ -14,7 +14,7 @@ decisions that belong to each bot author.
 | Delivery | Language | Package | Status |
 |---|---|---|---|
 | 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — runtime done, 11/11 conformance |
-| 2 | Go | `github.com/chaskyapp/botsmith-sdk/go` | [`go/`](go/) — empty |
+| 2 | Go | `github.com/chaskyapp/botsmith-sdk/go` | [`go/`](go/) — implemented, conformance pending a run |
 | 3 | Python | `chasky-botsmith` | [`python/`](python/) — empty |
 
 The order is TypeScript → Go → Python. The reason is in §5 of the contract: **a
