@@ -81,8 +81,8 @@ inglés, pensado para logs — **no** es mecanismo de control de flujo.
 
 Códigos observados: `400` `BAD_REQUEST` / `TEXT_REQUIRED` /
 `ACTION_NOT_SUPPORTED` / `REPLY_TO_MESSAGE_NOT_FOUND`, `401` `TOKEN_INVALID`,
-`403` `BOT_SUSPENDED` / `CHAT_FORBIDDEN`, `404` `CHAT_NOT_FOUND`, `500`
-`INTERNAL_ERROR`.
+`403` `BOT_SUSPENDED` / `CHAT_FORBIDDEN`, `404` `CHAT_NOT_FOUND`, `409`
+`CONFLICT_POLLING` (§3.1), `500` `INTERNAL_ERROR`.
 
 Proyección de mensaje (la única, deliberadamente pobre — el `Message` de dominio
 tiene ~40 campos y ninguno más se filtra):
@@ -143,22 +143,59 @@ Vocabulario de comandos: `/newbot`, `/mybots`, `/help`, `/cancel`, `value`,
 Cada uno de estos seis puntos es una trampa que un autor pisa una vez, en
 producción, y tarda un rato en entender. Están en el orden en que duelen.
 
-### 3.1 Un solo consumidor lógico por bot, y el servidor no avisa
+### 3.1 Un solo consumidor por bot — el servidor ahora expulsa
 
-Dos `getUpdates` simultáneos sobre el mismo bot **se reparten** los updates: cada
-camino recibe la mitad, **sin error visible**. La invariante está declarada en el
-diseño del servidor —consumer group `botapi-updates`, consumer fijo `api-1`,
-válida incluso entre réplicas de la API— y el spec dice explícitamente que
-detectar o rechazar al segundo consumidor queda fuera de v1.
+**Esto cambió el 2026-09-08** (commit `d4526381` de `backend-api-go`, spec
+`docs/sdd/botapi/botsmith/14-poll-exclusion.md`). El texto viejo de esta sección
+describía el peor modo de falla del sistema; hoy describe un contrato.
 
-Telegram, ante lo mismo, devuelve un `409 Conflict: terminated by other
-getUpdates request`. **Es una diferencia real a favor de Telegram** y está
-levantada como pedido al servidor en §13 (S1).
+**Antes**: dos `getUpdates` simultáneos sobre el mismo bot **se repartían** los
+updates —cada camino recibía la mitad, sin error ni log—, porque los dos polls
+usaban el mismo nombre de consumidor y `XREADGROUP` reparte. Desde afuera se veía
+"un bot que a veces no responde", y no había nada en los logs que lo explicara.
 
-Mientras tanto el SDK hace lo único que puede hacer desde afuera: garantizar que
-**una instancia** nunca tenga dos polls en vuelo, y fallar ruidosamente si se la
-arranca dos veces. Lo que pasa entre dos procesos distintos no lo ve, y el
-documento tiene que decirlo con todas las letras (§8, L3).
+**Ahora**: hay un cerrojo por bot (`botapi:poll:<botID>`) y `getUpdates` devuelve
+**`409 CONFLICT_POLLING`**. Chasky imita a Telegram, que corta con
+`409 Conflict: terminated by other getUpdates request`.
+
+Tres detalles del mecanismo que el SDK necesita saber, y que no se deducen de
+"hay un 409":
+
+1. **El que llega DESPLAZA al que estaba.** El cerrojo se toma sin condición
+   (`SET` sin `NX`), así que **el `409` le llega al poll VIEJO**, no al nuevo. El
+   servidor lo eligió así porque el caso frecuente es un reinicio del bot, y
+   hacer esperar al proceso que acaba de arrancar sería un impuesto diario para
+   prevenir un accidente de configuración que se arregla una vez.
+
+   Consecuencia directa y nada obvia: **`start()` no es una operación inocente.**
+   Arrancar el SDK expulsa a quien esté polleando ese bot. En un despliegue con
+   dos réplicas, arrancar la segunda mata a la primera.
+
+2. **Perder el poll NO pierde mensajes.** El poll desplazado devuelve **cero**
+   entradas —no las que ya había leído: entregar a medias sería el mismo reparto
+   silencioso con menos elementos— y esas entradas quedan **sin ACK**, así que las
+   recupera la instancia que lo desplazó. El SDK no tiene que hacer nada. El autor
+   lo va a preguntar igual, y por eso está documentado acá.
+
+3. **El cerrojo tiene TTL corto y se renueva por tramo**, no dura el poll entero.
+   Un proceso que muere libera el bot en segundos en vez de esperar el timeout
+   máximo de 30 s. Para el SDK esto es una buena noticia operativa: reiniciar un
+   bot es rápido.
+
+**Lo que el SDK debe hacer con el `409`: detenerse, no reintentar.** Es terminal,
+como el `401`. El reflejo natural de un cliente es reintentar cualquier error que
+parezca transitorio, y acá ese reflejo es catastrófico: dos instancias que
+reintentan entran en una **guerra de expulsiones** —cada una desplaza a la otra,
+ninguna llega a procesar nada— y el resultado es peor que el reparto silencioso
+que este cambio vino a arreglar. Está anotado como garantía **G7** (§8.1) y como
+caso obligatorio de conformidad.
+
+**Y el mensaje importa.** El `409` **no** significa "configuración incorrecta":
+en un despliegue rolling es el flujo normal y correcto, y la instancia vieja debe
+morir limpia. El SDK dice *"otra instancia tomó el poll de este bot; esta se
+detiene"*, no *"error de configuración"*. Distinguir un deploy de un accidente no
+se puede hacer en el instante del `409` —son idénticos— y fingir que sí sería
+mentirle al autor.
 
 ### 3.2 El offset tiene que avanzar SIEMPRE
 
@@ -235,7 +272,7 @@ Y la lista de diferencias no se agota en los tipos:
 |---|---|---|
 | `chat.id`, `from.id`, `message_id` | número | **string** |
 | nombre del remitente | `first_name` | **`name`** |
-| poll concurrente | `409` explícito | se reparte, sin error |
+| poll concurrente | `409` explícito | **`409` explícito** — ya coincide |
 | `Idempotency-Key` | no existe | requerida por disciplina |
 | `sendChatAction` | vocabulario amplio | **solo `typing`** |
 | adjuntos, media, botones | sí | **no en v1** |
@@ -244,6 +281,15 @@ Y la lista de diferencias no se agota en los tipos:
 Un autor que trae un bot de Telegram y encuentra una API que se le parece pero
 falla distinto está peor que uno que encuentra una API honesta y distinta. La
 falsa familiaridad es más cara que la diferencia declarada.
+
+**Nota del 2026-09-08:** el `409` en poll concurrente pasó de diferencia a
+coincidencia (§3.1). Eso **no reabre esta decisión**. La fila que hace que un SDK
+de Telegram no funcione contra Chasky es la primera —`string` contra número—, no
+esta: una coincidencia más en una tabla de siete no cambia que los identificadores
+tengan otro tipo, y la coerción de identificadores sigue siendo un error
+silencioso. Lo que sí gana el `409` es que la **clasificación de errores** (§10.2)
+se acerca a la de Telegram, y eso abarata portar el manejo de errores. Es un
+ahorro real y no es la decisión de fondo.
 
 ### Qué sí se toma prestado
 
@@ -354,9 +400,14 @@ superficie que se mantiene sin usarse.
 Los dos paquetes existen en los tres lenguajes, con el nombre que cada ecosistema
 espera. El nombre cambia; la separación de credenciales no.
 
+El estándar es **la identidad `chasky` + el rol en una palabra** (`bot` para el
+runtime, `botsmith` para la gestión), escrito como cada ecosistema lo escribe.
+El scope `@chasky/` de npm está **confirmado disponible** (2026-09-08), y es el
+que fija el estándar para los otros dos.
+
 | | Runtime | Gestión |
 |---|---|---|
-| npm | `@chasky/bot` | `@chasky/botsmith` |
+| npm | `@chasky/bot` ✅ | `@chasky/botsmith` ✅ |
 | Go | `github.com/chaskyapp/bot-sdk/go` (`package chaskybot`) | `.../bot-sdk/go/botsmith` |
 | PyPI | `chasky-bot` | `chasky-botsmith` |
 
@@ -476,10 +527,12 @@ que hay que leer entera antes de escribir un bot.
   convertirse en un `400`; se recorta al máximo del servidor y se emite un aviso.
   Los valores que el servidor rechaza de plano —negativos, `limit: 0`— se
   rechazan en el SDK, con el motivo, antes de gastar una request.
-- **G7 — Reintento con backoff en lo transitorio, corte en lo terminal.** `401`
-  y `403 BOT_SUSPENDED` detienen el bot y disparan `onFatal`: reintentar un token
-  revocado es ruido infinito. Red, `5xx` y timeouts reintentan con backoff
-  exponencial y jitter.
+- **G7 — Reintento con backoff en lo transitorio, corte en lo terminal.** `401`,
+  `403 BOT_SUSPENDED` y **`409 CONFLICT_POLLING`** detienen el bot y disparan
+  `onFatal`: reintentar un token revocado es ruido infinito, y reintentar un
+  `409` es una **guerra de expulsiones** en la que dos instancias se desplazan
+  mutuamente y ninguna procesa nada (§3.1). Red, `5xx` y timeouts reintentan con
+  backoff exponencial y jitter.
 - **G8 — Cancelación limpia.** `stop()` aborta el long-poll en vuelo; no espera
   hasta 30 segundos a que venza el deadline del servidor.
 - **G9 — Los identificadores se reemiten tal cual llegaron.** El SDK nunca
@@ -495,11 +548,15 @@ que hay que leer entera antes de escribir un bot.
   memoria: al reiniciar, el servidor reentrega el PEL y el bot vuelve a ver
   updates ya procesados. Se expone un gancho `OffsetStore` opcional, y **queda
   documentado que el default reprocesa** (§12, D7).
-- **L3 — Un solo proceso por bot.** G1 vale **por instancia**. El SDK no puede
-  ver otra réplica, y el servidor no la rechaza (§3.1). Correr dos procesos del
-  mismo bot rompe la entrega en silencio, y eso es del despliegue. Mientras el
-  pedido S1 no exista, esto es la limitación más peligrosa del sistema y el
-  README tiene que abrirlo con eso.
+- **L3 — Un solo proceso por bot.** G1 vale **por instancia**: el SDK no puede
+  ver otra réplica. **Desde el 2026-09-08 el servidor sí la rechaza** con un
+  `409` (§3.1), así que esto dejó de ser el peor modo de falla del sistema —era
+  silencioso, ahora es ruidoso— y pasó a ser una condición operativa normal.
+
+  Lo que queda delegado es **decidir cuántos procesos corren**. El servidor deja
+  polleando al último que arrancó; si el despliegue levanta dos réplicas, una va
+  a morir con `409` cada vez. El SDK reporta el hecho; que haya una sola es del
+  despliegue.
 - **L4 — La retención del stream.** `BOTAPI_STREAM_MAXLEN=10000` por bot, y el
   `XTRIM` puede llevarse incluso updates no confirmados. Un bot caído más tiempo
   del que cubre esa ventana pierde updates. Es operación, no SDK.
@@ -557,6 +614,7 @@ declara la description como legible y estable, pero no como enumerada.
 | Clase | Códigos | Qué hace el SDK |
 |---|---|---|
 | Terminal | `401`, `403 BOT_SUSPENDED` | Detiene el bot, dispara `onFatal`. No reintenta. |
+| Terminal — desplazado | `409 CONFLICT_POLLING` | Detiene el bot. **Nunca reintenta**: reintentar es una guerra de expulsiones (§3.1). El mensaje dice "otra instancia tomó el poll", no "error de configuración". |
 | De negocio | `400`, `403 CHAT_FORBIDDEN`, `404` | Devuelve el error al llamador. No reintenta: reintentar un `text` vacío da un `text` vacío. |
 | Transitorio | `500`, `5xx`, red, timeout | Backoff exponencial con jitter, **reusando la misma `Idempotency-Key`**. |
 
@@ -642,7 +700,7 @@ de código.
 | **D2** | ¿Compatible con Telegram o nativo? | **Nativo**, con el modelo mental de Telegram | Los ids son string vs número; toda coerción es error silencioso. §4 |
 | **D3** | Superficie | **Dos paquetes por lenguaje**; runtime primero, gestión después | Credenciales distintas: un paquete único hace *escribible* mandar el `X-Secret` desde el proceso del bot. §6 |
 | **D4** | Webhook | **Seam de transporte, sin comprometer forma** | El servidor no lo construyó todavía. §11 |
-| **D9** | Layout y nombres | **Monorepo `bot-sdk`**, un directorio por lenguaje en la raíz | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
+| **D9** | Layout y nombres | **Monorepo `bot-sdk`**, un directorio por lenguaje en la raíz; scope npm **`@chasky/`** confirmado disponible | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
 
 ### Abiertas
 
@@ -661,12 +719,18 @@ de código.
 
 Salen de este análisis y son tickets de `backend-api-go`, no del SDK.
 
-- **S1 — `409` en `getUpdates` concurrente, como Telegram.** *Prioridad alta.* Es
-  el hallazgo #1 del §3.1: hoy dos consumidores se reparten los updates sin error
-  visible, y ninguna cantidad de disciplina del cliente lo detecta desde afuera.
-  Un `409` explícito convierte el peor modo de falla del sistema —silencioso,
-  intermitente, imposible de diagnosticar— en un mensaje de error. El spec lo
-  dejó fuera de v1 a conciencia; el SDK es la evidencia de que hace falta.
+- **S1 — `409` en `getUpdates` concurrente, como Telegram. ✅ RESUELTO
+  (2026-09-08, commit `d4526381`).** Era el hallazgo #1: dos consumidores se
+  repartían los updates sin error visible, y ninguna disciplina del cliente lo
+  detectaba desde afuera. Hoy hay un cerrojo por bot y un `409 CONFLICT_POLLING`
+  (§3.1). El peor modo de falla del sistema —silencioso, intermitente, imposible
+  de diagnosticar— pasó a ser un mensaje de error.
+
+  **Salvedad para el repo del servidor, no para el SDK:** el `Req.X1` de
+  `14-poll-exclusion.md` dice que falla *el que llega*; la implementación hace lo
+  contrario y **desplaza al que estaba**, con el motivo explicado en el commit.
+  El código manda y el SDK se escribe contra el código; ese spec quedó
+  desactualizado.
 - **S2 — Normalizar `getMe`.** Devuelve `first_name` (nombre de Telegram) cuando
   el resto del contrato usa `name` (nombre de Chasky). Habiendo elegido no ser
   compatible con Telegram, esa asimetría no compra nada y confunde. Agregar

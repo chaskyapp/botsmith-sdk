@@ -139,6 +139,11 @@ porque son las que un puerto apurado rompe:
   SDK **no** contiene el token. **G5.**
 - `timeout: 60` → la request sale con el máximo del servidor, no con 60. **G6.**
 - `401` → el bot se detiene y no reintenta. `500` → reintenta con backoff. **G7.**
+- `409 CONFLICT_POLLING` → el bot se detiene y **no manda un solo poll más**.
+  **G7.** Es el caso que más barato es de romper y más caro de diagnosticar: un
+  SDK que reintenta el `409` mete a dos instancias en una guerra de expulsiones
+  donde ninguna procesa nada. El caso debe verificar **cero requests posteriores**,
+  no solamente que se haya reportado el error.
 
 ### Cómo se ejecuta
 

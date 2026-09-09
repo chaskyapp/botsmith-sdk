@@ -35,10 +35,11 @@ segundo puerto más barato porque el equipo ya lo escribe y `pepibot` ya existe.
 
 ## Lo más importante, en tres líneas
 
-1. **Un solo proceso por bot.** Dos `getUpdates` simultáneos se reparten los
-   updates **sin error visible**. El SDK garantiza un solo poll por instancia; lo
-   que pasa entre procesos no lo ve nadie hasta que el servidor devuelva `409`
-   (pedido S1 — es el hallazgo más grave del análisis).
+1. **Un solo proceso por bot, y arrancar desplaza al que estaba.** Desde el
+   2026-09-08 el servidor devuelve `409 CONFLICT_POLLING` y el poll **viejo** es
+   el que muere. El SDK se detiene ante un `409` y **no reintenta**: reintentar
+   mete a dos instancias en una guerra de expulsiones. Perder el poll no pierde
+   mensajes.
 2. **El offset avanza siempre**, aunque el handler falle. Es un cursor de
    lectura, no un ack de negocio.
 3. **El token viaja en la ruta** y se filtra a los logs por el transporte. Todo
@@ -50,3 +51,7 @@ Quedan **seis decisiones abiertas** en el §12 del contrato. D6 —la ventana de
 deduplicación— es bloqueante: cambia la estructura de datos del núcleo en los
 tres SDKs, y se resuelve verificando si el PEL de Redis puede reentregar fuera de
 orden.
+
+Los paquetes se llaman `@chasky/bot` y `@chasky/botsmith` en npm (scope
+confirmado disponible), y el mismo estándar —identidad `chasky` + rol en una
+palabra— se traslada a Go y a PyPI.
