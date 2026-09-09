@@ -14,6 +14,17 @@ async function main(): Promise<void> {
   const only = valueOf(args, "--only");
 
   const factory = await loadFactory(factoryArg);
+  // Without this line, "9 failed" reads as a broken SDK. It is a broken FIXTURE,
+  // on purpose, and the run is measuring the runner rather than any SDK.
+  const isFixture = factoryArg.includes("fixtures/");
+  if (isFixture) {
+    console.log(
+      `Running against the fixture ${factoryArg}, not an SDK.\n` +
+        `It is deliberately incorrect, so FAILURES ARE THE EXPECTED RESULT: they prove the\n` +
+        `suite detects the guarantees it violates. The cases it does not violate should pass —\n` +
+        `a mixed result is the point. See "Validating a runner" in conformance/README.md.\n`,
+    );
+  }
   const files = (await readdir(CASES_DIR)).filter((f) => f.endsWith(".json")).sort();
   const selected = only ? files.filter((f) => f.includes(only)) : files;
 
@@ -35,6 +46,11 @@ async function main(): Promise<void> {
     `\n${results.length - failed.length}/${results.length} cases passed` +
       (failed.length ? `, ${failed.length} failed` : ""),
   );
+  if (isFixture) {
+    console.log(`(against a fixture — see the note above before reading this as a defect)`);
+  }
+  // The exit code still reports failures honestly. A fixture run is not meant
+  // for CI, so it is not worth teaching the exit code to lie about it.
   process.exit(failed.length ? 1 : 0);
 }
 
