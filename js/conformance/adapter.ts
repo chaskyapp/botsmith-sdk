@@ -48,4 +48,4 @@ export interface BotFactory {
  * Where the runner looks for the SDK's adapter. The SDK provides this module;
  * until it exists, `--factory` points the runner at a fixture instead.
  */
-export const DEFAULT_FACTORY = "../src/conformance-adapter.js";
+export const DEFAULT_FACTORY = "./sdk-adapter.js";
