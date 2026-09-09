@@ -16,12 +16,13 @@ async function main(): Promise<void> {
   const factory = await loadFactory(factoryArg);
   // Management cases need their own client; a fixture run has none, and those
   // cases report a clear setup failure rather than a confusing mismatch.
-  const managementFactory = factoryArg === DEFAULT_FACTORY
-    ? (await import("./management-sdk-adapter.js")).managementFactory
-    : undefined;
+  const managementArg = valueOf(args, "--management-factory");
+  const managementFactory = managementArg
+    ? (await import(pathToFileURL(resolve(HERE, managementArg)).href)).managementFactory
+    : (await import("./management-sdk-adapter.js")).managementFactory;
   // Without this line, "9 failed" reads as a broken SDK. It is a broken FIXTURE,
   // on purpose, and the run is measuring the runner rather than any SDK.
-  const isFixture = factoryArg.includes("fixtures/");
+  const isFixture = factoryArg.includes("fixtures/") || (managementArg?.includes("fixtures/") ?? false);
   if (isFixture) {
     console.log(
       `Running against the fixture ${factoryArg}, not an SDK.\n` +

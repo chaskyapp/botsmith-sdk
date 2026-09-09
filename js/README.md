@@ -39,6 +39,15 @@ npm run conformance
 
 Add `--only g7` to run a subset.
 
+The management half has its own fixture, which makes the one mistake `m1` exists
+to catch — sending `null` for an unset optional instead of omitting it:
+
+```bash
+npm run conformance -- --management-factory ./fixtures/broken-management.ts --only m
+```
+
+`m1` must fail against it. If it passes, the runner is not checking bodies.
+
 ## What the SDK has to expose
 
 The runner is written against [`conformance/adapter.ts`](conformance/adapter.ts)
