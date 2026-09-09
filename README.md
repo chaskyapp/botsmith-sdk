@@ -49,10 +49,13 @@ second port because the team already writes it and `pepibot` already exists.
 
 ## Before writing code
 
-**Six decisions are still open** in §12 of the contract. None of them blocks any
-more: D6 —the deduplication strategy— was the blocking one and closed on
-2026-09-08, verified against the server code. It resolves to a single integer
-threshold, not a data structure.
+**All twelve decisions in §12 of the contract are resolved.** The last five closed
+on 2026-09-08. The only item left is executing D12 — translating `docs/` to
+English — which blocks no code.
+
+Worth knowing before reading the contract: deduplication and the poll offset are
+**the same single integer** (`offset == lastSeen + 1`), verified against the
+server code. The SDK keeps one number, not a data structure.
 
 Packages are `@chasky/bot` and `@chasky/botsmith` on npm (scope confirmed
 available), and the same standard —the `chasky` identity plus the role in one

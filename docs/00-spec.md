@@ -585,6 +585,9 @@ que hay que leer entera antes de escribir un bot.
   umbral es **siempre** un duplicado (D6, §12 — verificado contra el código).
   pepibot usa un `map` que crece para siempre; en un proceso que vive meses eso
   es una fuga, y el umbral la elimina de raíz.
+
+  Ese entero es **el mismo** que alimenta el offset: `offset == lastSeen + 1` en
+  todo momento (D7, §12). El SDK guarda un número, no dos.
 - **G4 — `Idempotency-Key` administrada.** Una key nueva por mensaje lógico, la
   **misma** en cada reintento interno de ese envío. El autor nunca la escribe ni
   la ve. Si la fuente de aleatoriedad falla, **no se envía**: mandar sin key es
@@ -615,8 +618,9 @@ que hay que leer entera antes de escribir un bot.
   duplicados; no los elimina.
 - **L2 — Persistencia del offset entre reinicios.** Por defecto el offset vive en
   memoria: al reiniciar, el servidor reentrega el PEL y el bot vuelve a ver
-  updates ya procesados. Se expone un gancho `OffsetStore` opcional, y **queda
-  documentado que el default reprocesa** (§12, D7).
+  updates ya procesados. Se expone un gancho `OffsetStore` opcional —`load()` /
+  `save(n)`, invocado una vez por lote— y **queda documentado que el default
+  reprocesa** (D7, §12, cerrada).
 - **L3 — Un solo proceso por bot.** G1 vale **por instancia**: el SDK no puede
   ver otra réplica. **Desde el 2026-09-08 el servidor sí la rechaza** con un
   `409` (§3.1), así que esto dejó de ser el peor modo de falla del sistema —era
@@ -769,8 +773,13 @@ de código.
 | **D2** | ¿Compatible con Telegram o nativo? | **Nativo**, con el modelo mental de Telegram | Los ids son string vs número; toda coerción es error silencioso. §4 |
 | **D3** | Superficie | **Dos paquetes por lenguaje**; runtime primero, gestión después | Envelopes incompatibles y un `409` que significa lo opuesto en cada superficie; y un paquete único hace *escribible* mandar el `X-Secret` desde el proceso del bot. §6 |
 | **D4** | Webhook | **Seam de transporte, sin comprometer forma** | El servidor no lo construyó todavía. §11 |
+| **D5** | Destino de pepibot | **Cliente de conformidad** en `reference/pepibot/`, no semilla de `sdk/go` | Es el único cliente que corre contra las dos plataformas, y el SDK nativo pierde esa capacidad. El movimiento efectivo es tarea de la entrega 2 (abajo) |
 | **D6** | Dedup por `update_id` | **Umbral `> lastSeen`**: un entero, sin estructura de datos | Verificado en el código (abajo). Es más barato **y** más correcto que una ventana finita |
+| **D7** | Persistencia del offset | Gancho `OffsetStore` **opcional**, default en memoria | Un default con disco sorprende; uno con memoria reprocesa **y se ve**. Y el estado es **un solo entero** (abajo) |
+| **D8** | `http://` no local | **Advertir una vez**, no negarse; opción explícita para silenciar | Negarse rompe staging interno legítimo — TLS terminado en el ingress, túneles, compose |
 | **D9** | Layout y nombres | **Monorepo `bot-sdk`**, un directorio por lenguaje en la raíz; scope npm **`@chasky/`** confirmado disponible | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
+| **D10** | Formato de la conformidad | **Casos JSON** + un fake HTTP por lenguaje | Idiomático y sin proceso externo. Decisión **reversible** (abajo) |
+| **D11** | Versionado | **Independiente por paquete** + versión del contrato declarada aparte | La pregunta que importa no es qué versión tiene el paquete, sino qué garantías implementa |
 
 #### Verificación de D6 (2026-09-08)
 
@@ -802,16 +811,75 @@ sea un entero en vez de una estructura es el bonus.
 `lastSeen` arranca en cero y el PEL se reprocesa — eso es **D7**, no D6, y es el
 default documentado en L2.
 
+#### D7 — y el hallazgo de que el estado es un solo entero
+
+`OffsetStore` es una interfaz de dos métodos, `load()` y `save(n)`, invocada
+**una vez por lote** y no por update: guardar por update sería correcto y lento.
+
+Y hay una simplificación que cae de D6 y que conviene tener escrita antes de
+implementar tres veces: **el offset y el umbral de dedup son el mismo número.**
+
+Con G2 el offset es `max(update_id del lote) + 1`, y con G3 el umbral es
+`max(update_id procesado)`. Como el offset avanza pase lo que pase con los
+handlers, al cerrar cada lote vale siempre `offset == lastSeen + 1`. **No son dos
+piezas de estado: es una.** El `OffsetStore` persiste un entero, y de ahí salen
+las dos cosas.
+
+Default en memoria porque un default con disco sorprende —¿dónde escribe, con qué
+permisos, qué pasa en un contenedor efímero?— y porque reprocesar al reiniciar no
+viola nada: at-least-once ya está delegado en L1. Es visible, es documentado, y
+quien no lo quiera implementa la interfaz.
+
+#### D8 — advertir, con precisión
+
+La advertencia se emite **una sola vez, al construir el cliente**, no por request:
+una advertencia por poll es ruido que se termina filtrando en un grep.
+
+"Local" es **solo loopback**: `localhost`, `127.0.0.0/8`, `::1`, `*.localhost`.
+Deliberadamente NO incluye `*.local`, que en mDNS puede ser una máquina de la red
+real y ahí el token viaja en claro por la ruta.
+
+Se silencia con una opción explícita (`allowInsecureTransport: true`). Quien la
+escribe, sabe lo que está aceptando; el default no lo decide por él.
+
+#### D10 — casos JSON, y por qué no el binario único
+
+La alternativa era un binario de conformidad que hospeda el fake y contra el que
+los tres SDKs pegan por HTTP real. Es **más fiel** —HTTP de verdad, no un mock— y
+se paga caro: hay que construirlo y mantenerlo, cada CI tiene que arrancarlo,
+esperar el puerto y matarlo, y aparece una familia entera de fallas nuevas que no
+son del SDK (puertos ocupados, carreras de arranque).
+
+Los casos JSON con un fake por lenguaje usan el mock HTTP que cada ecosistema ya
+tiene, sin proceso externo. **JSON y no YAML** porque los tres lenguajes lo
+parsean sin agregar dependencia.
+
+El riesgo real es que tres fakes interpreten un caso distinto. Se acota haciendo
+que el caso declare **las requests esperadas de forma exacta** —método, ruta,
+cabeceras, cuerpo— y que el fake solo las reproduzca: lo que se verifica es lo
+observado contra lo declarado, nunca lógica que viva dentro del fake.
+
+Es una decisión **reversible**, y ese es medio argumento: si los tres fakes
+empiezan a divergir, se migra al binario único con los mismos casos.
+
+#### D11 — versión de paquete y versión de contrato
+
+Cada paquete lleva su semver y se publica cuando tiene algo que publicar: un fix
+de empaquetado en Python no fuerza releases vacíos en TypeScript y Go.
+
+Aparte, cada paquete declara **contra qué versión del contrato** cumple, y los
+casos de conformidad declaran a qué versión pertenecen. Eso responde la única
+pregunta que de verdad importa entre tres implementaciones: *¿estos dos SDKs
+garantizan lo mismo?* — que la versión del paquete no contesta.
+
+La versión del contrato es `MAJOR.MINOR`: **MINOR** cuando se agrega una garantía,
+**MAJOR** cuando cambia una que ya existía.
+
 ### Abiertas
 
 | # | Decisión | Recomendación | Qué falta |
 |---|---|---|---|
-| **D5** | Destino de pepibot | **Cliente de conformidad** en `reference/pepibot/`, no semilla de `sdk/go` | Es el único cliente que corre contra las dos plataformas; el SDK de Go pierde esa capacidad. ¿Lo movemos, o lo dejás en `~/Desktop`? |
-| **D7** | Persistencia del offset | Gancho `OffsetStore` **opcional**, default en memoria | Un default con disco sorprende; uno con memoria reprocesa al reiniciar. Se elige reprocesar y documentarlo. ¿De acuerdo? |
-| **D8** | `http://` no local | **Advertir**, no negarse | Negarse rompe staging interno legítimo. ¿Preferís que se niegue y haya que optar explícitamente? |
-| **D10** | Formato de la suite de conformidad | Casos declarativos **JSON** contra un servidor fake por lenguaje | Alternativa: un único binario de conformidad que hospeda el fake y los tres SDKs corren contra él por HTTP. Más fiel, más caro. §6 de `01-organizacion.md` |
-| **D12** | Traducir `docs/` al inglés | **Sí, cuando cierren D5, D7, D8, D10 y D11.** Incluye renombrar `01-organizacion.md` → `01-organization.md` y los enlaces que lo apuntan | Cerrada en cuanto al *qué*; abierta como **tarea pendiente con disparador**. Está en esta lista a propósito: un paso pendiente que no se cuenta es un paso que se olvida |
-| **D11** | Versionado de los tres paquetes | **Independiente**, con la versión del contrato declarada aparte | Alternativa: versión única sincronizada. Es más simple de explicar y obliga a releases vacíos. `01-organizacion.md` |
+| **D12** | Traducir `docs/` al inglés | **DISPARADA el 2026-09-08**: D5, D7, D8, D10 y D11 cerraron, así que esto es lo único pendiente. Incluye renombrar `01-organizacion.md` → `01-organization.md`, actualizar los enlaces y quitar los avisos *"(in Spanish for now)"* de los READMEs | Ya no espera nada. Queda en esta lista hasta ejecutarse, que es exactamente para lo que estaba: un paso pendiente que no se cuenta es un paso que se olvida |
 
 ---
 

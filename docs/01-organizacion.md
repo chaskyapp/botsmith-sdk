@@ -238,8 +238,9 @@ El orden **dentro** de cada entrega importa tanto como el orden entre lenguajes.
 
 ### Entrega 1 — TypeScript
 
-1. Cerrar D5–D8 y D10–D11 del contrato. **Sin esto no se escribe código**: D6
-   (ventana de dedup) cambia la estructura de datos del núcleo en los tres.
+1. ~~Cerrar las decisiones del contrato.~~ **Hecho el 2026-09-08**: las doce
+   están resueltas y solo queda ejecutar D12 (traducir `docs/`), que no bloquea
+   código.
 2. Escribir los casos de conformidad **antes** que el SDK. Salen del §8 del
    contrato, no de la implementación.
 3. Runner de conformidad en TypeScript.
@@ -248,18 +249,21 @@ El orden **dentro** de cada entrega importa tanto como el orden entre lenguajes.
 
 ### Entrega 2 — Go
 
-6. `bot-sdk/go`, mirando pepibot pero sin heredarlo (§5.4 del contrato).
-7. Runner de conformidad en Go, contra **los mismos casos**.
-8. **Reconciliar.** Acá aparecen los casos ambiguos. Corregir el caso y después
+6. Mover `~/Desktop/pepibot/` a `reference/pepibot/` y **traducir sus comentarios
+   al inglés** (D5). No se hizo antes a propósito: el archivo está en uso y
+   copiarlo entonces habría creado dos versiones divergiendo desde el día uno.
+7. `bot-sdk/go`, mirando pepibot pero sin heredarlo (§5.4 del contrato).
+8. Runner de conformidad en Go, contra **los mismos casos**.
+9. **Reconciliar.** Acá aparecen los casos ambiguos. Corregir el caso y después
    las dos implementaciones — en ese orden.
 
 ### Entrega 3 — Python
 
-9. `chasky-bot`, con el contrato ya sacudido por dos puertos.
-10. Runner y conformidad.
+10. `chasky-bot`, con el contrato ya sacudido por dos puertos.
+11. Runner y conformidad.
 
 ### Transversal, en cualquier momento
 
-11. Los pedidos al servidor del §13 del contrato. **S1 (el `409` en `getUpdates`
+12. Los pedidos al servidor del §13 del contrato. **S1 (el `409` en `getUpdates`
     concurrente) no depende de ningún SDK y es el hallazgo más grave del
     análisis**: puede arrancar hoy, en paralelo con la entrega 1.
