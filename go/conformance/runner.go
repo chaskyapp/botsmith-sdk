@@ -25,8 +25,12 @@ type Failure struct {
 
 func (f Failure) String() string { return f.Where + ": " + f.Detail }
 
-// RunCase executes one case and returns everything that went wrong.
+// RunCase executes one runtime case and returns everything that went wrong.
+// Management cases go through RunManagementCase instead.
 func RunCase(c Case, factory Factory) []Failure {
+	if c.Kind == "management" {
+		return runManagementCase(c, NewSDKManagement)
+	}
 	fake := NewFakeServer(c.Exchanges)
 	defer fake.Close()
 
@@ -51,6 +55,12 @@ func RunCase(c Case, factory Factory) []Failure {
 	failures := checkRequests(c, fake)
 	failures = append(failures, checkAssertions(c, bot)...)
 	return failures
+}
+
+// RunManagementCase drives a case against a specific management client, so a
+// test can point it at a deliberately broken one and prove this runner checks.
+func RunManagementCase(c Case, factory ManagementFactory) []Failure {
+	return runManagementCase(c, factory)
 }
 
 func waitForCompletion(bot BotUnderTest, fake *FakeServer, timeout time.Duration) {

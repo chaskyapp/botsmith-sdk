@@ -47,13 +47,26 @@ type Assertions struct {
 		UpdateID int64 `json:"updateId"`
 		Times    int   `json:"times"`
 	} `json:"handlerRuns"`
-	ErrorsReported []struct {
-		Code        *int   `json:"code"`
-		NotContains string `json:"notContains"`
+	// Management: the revealed token must come back from the call itself and
+	// appear in none of the listed places.
+	SecretReturnedOnce string   `json:"secretReturnedOnce"`
+	SecretNotIn        []string `json:"secretNotIn"`
+	ErrorsReported     []struct {
+		Code *int `json:"code"`
+		// Management codes are strings, not numbers.
+		ManagementCode string `json:"managementCode"`
+		Retryable      *bool  `json:"retryable"`
+		AccessLost     *bool  `json:"accessLost"`
+		NotContains    string `json:"notContains"`
 	} `json:"errorsReported"`
 	Warnings []struct {
 		Contains string `json:"contains"`
 	} `json:"warnings"`
+}
+
+type ManagementCall struct {
+	Method string         `json:"method"`
+	Args   map[string]any `json:"args"`
 }
 
 type Case struct {
@@ -62,7 +75,10 @@ type Case struct {
 	Guarantee       string `json:"guarantee"`
 	Title           string `json:"title"`
 	Why             string `json:"why"`
-	Bot             struct {
+	// Kind is empty for runtime cases.
+	Kind  string           `json:"kind"`
+	Calls []ManagementCall `json:"calls"`
+	Bot   struct {
 		Transport string `json:"transport"`
 		Options   struct {
 			Limit          int `json:"limit"`
