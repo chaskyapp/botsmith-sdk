@@ -1,2 +1,4 @@
 node_modules/
 dist/
+# Never commit a bot token. It is the only credential the Bot API has.
+.env
