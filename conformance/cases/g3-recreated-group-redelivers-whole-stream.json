@@ -4,45 +4,203 @@
   "guarantee": "G3",
   "title": "A full stream redelivery runs no handler again",
   "why": "This is the case that separates a threshold from a finite window. When the consumer group is recreated the server's last-delivered-id resets to zero and the ENTIRE stream is redelivered. A window of the last N ids reprocesses everything older than N; a `> lastSeen` threshold does not flinch. See D6 in the contract.",
-
   "bot": {
     "transport": "polling",
-    "options": { "limit": 50, "timeoutSeconds": 25 },
-    "handler": { "kind": "reply" }
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply"
+    }
   },
-
   "exchanges": [
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [
-        { "update_id": 1, "message": { "message_id": "m1", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376000, "text": "one" } },
-        { "update_id": 2, "message": { "message_id": "m2", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376001, "text": "two" } }
-      ] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 1,
+              "message": {
+                "message_id": "m1",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376000,
+                "text": "one"
+              }
+            },
+            {
+              "update_id": 2,
+              "message": {
+                "message_id": "m2",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376001,
+                "text": "two"
+              }
+            }
+          ]
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/sendMessage", "body": { "text": "one" } },
-      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r1", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376002, "text": "one" } } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "text": "one"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r1",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi"
+            },
+            "chat": {
+              "id": "bot:b1:u1",
+              "type": "private"
+            },
+            "date": 1757376002,
+            "text": "one"
+          }
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/sendMessage", "body": { "text": "two" } },
-      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r2", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376003, "text": "two" } } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "text": "two"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r2",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi"
+            },
+            "chat": {
+              "id": "bot:b1:u1",
+              "type": "private"
+            },
+            "date": 1757376003,
+            "text": "two"
+          }
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 3 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [
-        { "update_id": 1, "message": { "message_id": "m1", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376000, "text": "one" } },
-        { "update_id": 2, "message": { "message_id": "m2", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376001, "text": "two" } }
-      ] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 3
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 1,
+              "message": {
+                "message_id": "m1",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376000,
+                "text": "one"
+              }
+            },
+            {
+              "update_id": 2,
+              "message": {
+                "message_id": "m2",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376001,
+                "text": "two"
+              }
+            }
+          ]
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 3 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 3
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
     }
   ],
-
   "assert": {
     "botStopped": false,
-    "handlerRuns": [ { "updateId": 1, "times": 1 }, { "updateId": 2, "times": 1 } ]
+    "handlerRuns": [
+      {
+        "updateId": 1,
+        "times": 1
+      },
+      {
+        "updateId": 2,
+        "times": 1
+      }
+    ]
   },
-  "run": { "timeoutMs": 3000 }
+  "run": {
+    "timeoutMs": 3000
+  }
 }

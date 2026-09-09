@@ -4,39 +4,139 @@
   "guarantee": "G3",
   "title": "A redelivered update does not run the handler a second time",
   "why": "Delivery is at-least-once and the server reassigns no ids on redelivery. Without client-side deduplication the bot answers the same message twice, which for a handler with outward effects means charging twice.",
-
   "bot": {
     "transport": "polling",
-    "options": { "limit": 50, "timeoutSeconds": 25 },
-    "handler": { "kind": "reply" }
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply"
+    }
   },
-
   "exchanges": [
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [
-        { "update_id": 6, "message": { "message_id": "m6", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376000, "text": "six" } }
-      ] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 6,
+              "message": {
+                "message_id": "m6",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376000,
+                "text": "six"
+              }
+            }
+          ]
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/sendMessage", "body": { "text": "six" } },
-      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r6", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376001, "text": "six" } } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "text": "six"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r6",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi"
+            },
+            "chat": {
+              "id": "bot:b1:u1",
+              "type": "private"
+            },
+            "date": 1757376001,
+            "text": "six"
+          }
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 7 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [
-        { "update_id": 6, "message": { "message_id": "m6", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376000, "text": "six" } }
-      ] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 7
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 6,
+              "message": {
+                "message_id": "m6",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376000,
+                "text": "six"
+              }
+            }
+          ]
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 7 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 7
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
     }
   ],
-
   "assert": {
     "botStopped": false,
-    "handlerRuns": [ { "updateId": 6, "times": 1 } ]
+    "handlerRuns": [
+      {
+        "updateId": 6,
+        "times": 1
+      }
+    ]
   },
-  "run": { "timeoutMs": 3000 }
+  "run": {
+    "timeoutMs": 3000
+  }
 }

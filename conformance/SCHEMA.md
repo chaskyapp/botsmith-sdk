@@ -43,6 +43,17 @@ the format work:
    with no special syntax: the case simply ends.
 2. **Order is explicit.** Exchange *n* must be the SDK's *n*-th request. Any
    reordering is a failure.
+3. **`"repeat": true` on the LAST exchange marks the idle steady state.** A bot
+   that is still alive keeps long-polling forever, and those polls are correct
+   behaviour — without this, every non-terminal case would fail for a reason that
+   is an artifact of the format rather than a defect in the SDK. Polls past the
+   list must still match that last expectation: the bot may idle, but it may not
+   idle *differently*.
+
+   Terminal cases (`g7-401`, `g7-409`) deliberately omit `repeat`, so
+   exhaustiveness still catches a bot that should have stopped and did not. **The
+   presence or absence of `repeat` is how a case declares whether the bot is
+   supposed to survive it.**
 
 ### `expect`
 

@@ -88,8 +88,14 @@ function checkRequests(testCase: ConformanceCase, server: FakeServer): Failure[]
   const failures: Failure[] = [];
   const captures: Captures = new Map();
 
-  for (let i = 0; i < testCase.exchanges.length; i++) {
-    const expected = testCase.exchanges[i]!.expect;
+  const last = testCase.exchanges[testCase.exchanges.length - 1];
+  const repeats = last?.repeat === true;
+  // With a repeating tail, every poll past the declared list must still match
+  // that last expectation — the bot may idle, but it may not idle differently.
+  const total = repeats ? Math.max(testCase.exchanges.length, server.observed.length) : testCase.exchanges.length;
+
+  for (let i = 0; i < total; i++) {
+    const expected = (testCase.exchanges[i] ?? last)!.expect;
     const actual = server.observed[i];
     if (!actual) {
       failures.push(failure(`request #${i + 1}`, `expected ${describeExpected(expected)}, but the SDK never sent it`));

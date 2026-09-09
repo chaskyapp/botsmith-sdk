@@ -4,38 +4,123 @@
   "guarantee": "G4",
   "title": "An internal retry of one send reuses that send's Idempotency-Key",
   "why": "The key is what makes a retry safe. A retry with a FRESH key is not a retry: it is a second message, and the user sees the bot answer twice. The pair with g4-fresh-key-per-logical-message is the whole of G4 — a new key per logical message, the same key for that message's retries.",
-
   "bot": {
     "transport": "polling",
-    "options": { "limit": 50, "timeoutSeconds": 25 },
-    "handler": { "kind": "reply" }
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply"
+    }
   },
-
   "exchanges": [
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [
-        { "update_id": 5, "message": { "message_id": "m5", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376000, "text": "five" } }
-      ] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376000,
+                "text": "five"
+              }
+            }
+          ]
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/sendMessage",
-                  "headers": { "Idempotency-Key": "$capture:k1" },
-                  "body": { "text": "five" } },
-      "respond": { "status": 500, "body": { "ok": false, "error_code": 500, "description": "INTERNAL_ERROR" } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "headers": {
+          "Idempotency-Key": "$capture:k1"
+        },
+        "body": {
+          "text": "five"
+        }
+      },
+      "respond": {
+        "status": 500,
+        "body": {
+          "ok": false,
+          "error_code": 500,
+          "description": "INTERNAL_ERROR"
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/sendMessage",
-                  "headers": { "Idempotency-Key": "$same:k1" },
-                  "body": { "text": "five" } },
-      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r5", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376002, "text": "five" } } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "headers": {
+          "Idempotency-Key": "$same:k1"
+        },
+        "body": {
+          "text": "five"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r5",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi"
+            },
+            "chat": {
+              "id": "bot:b1:u1",
+              "type": "private"
+            },
+            "date": 1757376002,
+            "text": "five"
+          }
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 6 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 6
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
     }
   ],
-
-  "assert": { "botStopped": false },
-  "run": { "timeoutMs": 5000 }
+  "assert": {
+    "botStopped": false
+  },
+  "run": {
+    "timeoutMs": 5000
+  }
 }

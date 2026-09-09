@@ -24,9 +24,13 @@ npm install
 npm run conformance -- --factory ./fixtures/naive-bot.ts
 ```
 
-That fixture is a deliberately naive bot, and **every case is expected to fail
-against it** — that is how the runner is proven to check anything at all. Once the
-SDK exports its adapter, drop the flag:
+That fixture is a deliberately naive bot. Cases fail against it **for their own
+reason** — and a couple pass, because the naive bot does not violate every
+guarantee. A mixed result is the point: a suite that rejects everything proves as
+little as one that accepts everything. See "Validating a runner" in
+[`../conformance/README.md`](../conformance/README.md).
+
+Once the SDK exports its adapter, drop the flag:
 
 ```bash
 npm run conformance

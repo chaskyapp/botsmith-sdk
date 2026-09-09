@@ -4,24 +4,56 @@
   "guarantee": "G7",
   "title": "A 500 is transient: retry, do not stop",
   "why": "The mirror of g7-401-stops-the-bot. If the SDK treats every error as terminal, a one-second server blip kills a bot that should have recovered on its own. The pair is what pins the boundary between terminal and transient.",
-
   "bot": {
     "transport": "polling",
-    "options": { "limit": 50, "timeoutSeconds": 25 },
-    "handler": { "kind": "noop" }
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "noop"
+    }
   },
-
   "exchanges": [
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
-      "respond": { "status": 500, "body": { "ok": false, "error_code": 500, "description": "INTERNAL_ERROR" } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 500,
+        "body": {
+          "ok": false,
+          "error_code": 500,
+          "description": "INTERNAL_ERROR"
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
     }
   ],
-
-  "assert": { "botStopped": false },
-  "run": { "timeoutMs": 5000 }
+  "assert": {
+    "botStopped": false
+  },
+  "run": {
+    "timeoutMs": 5000
+  }
 }

@@ -40,6 +40,20 @@ case can be satisfied by an SDK that is wrong in the opposite direction — one 
 retries everything passes `g7-500`, one that stops on everything passes `g7-401`.
 The pair is what pins the boundary.
 
+## Validating a runner
+
+`js/conformance/fixtures/naive-bot.ts` is a deliberately naive bot: the offset
+advances only on success, no deduplication, one idempotency key forever, no
+redaction, no clamping, retry everything including 401 and 409.
+
+Cases must fail against it **for their own reason**, and the useful expectation is
+not "all of them fail" — it is that each case fails exactly when its guarantee is
+violated and passes when it is not. The naive bot violates G2, G3, G4, G5, G6 and
+G7, so those cases fail; it happens to re-emit identifiers correctly and to retry
+a 500 correctly, so `g9-*` and `g7-500-*` pass. **That split is the better
+signal**: a suite that rejects everything is as useless as one that accepts
+everything, and only a mixed result shows it discriminates.
+
 ## What a runner must guarantee
 
 Learned the first time the runner met a broken SDK, and binding on the Go and

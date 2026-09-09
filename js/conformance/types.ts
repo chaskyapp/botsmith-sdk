@@ -21,6 +21,13 @@ export interface CannedResponse {
 export interface Exchange {
   expect: ExpectedRequest;
   respond: CannedResponse;
+  /**
+   * Only valid on the LAST exchange. Marks it as the idle steady state: a bot
+   * that is still alive keeps long-polling forever, and those polls are correct
+   * behaviour, not surplus. Terminal cases (401, 409) deliberately omit it, so
+   * exhaustiveness still catches a bot that should have stopped.
+   */
+  repeat?: boolean;
 }
 
 export interface HandlerSpec {

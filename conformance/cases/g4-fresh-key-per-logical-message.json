@@ -4,39 +4,150 @@
   "guarantee": "G4",
   "title": "Two distinct messages carry two distinct Idempotency-Keys",
   "why": "Reusing a key across different messages makes the server return the first result and SILENTLY DISCARD the second. The call answers 200 with a valid BotMessage, so it looks like it worked. It did not. This is the most invisible failure the SDK can cause.",
-
   "bot": {
     "transport": "polling",
-    "options": { "limit": 50, "timeoutSeconds": 25 },
-    "handler": { "kind": "reply" }
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply"
+    }
   },
-
   "exchanges": [
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [
-        { "update_id": 5, "message": { "message_id": "m5", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376000, "text": "five" } },
-        { "update_id": 6, "message": { "message_id": "m6", "from": { "id": "u1", "name": "Ana" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376001, "text": "six" } }
-      ] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376000,
+                "text": "five"
+              }
+            },
+            {
+              "update_id": 6,
+              "message": {
+                "message_id": "m6",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1757376001,
+                "text": "six"
+              }
+            }
+          ]
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/sendMessage",
-                  "headers": { "Idempotency-Key": "$capture:k1" },
-                  "body": { "text": "five" } },
-      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r5", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376002, "text": "five" } } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "headers": {
+          "Idempotency-Key": "$capture:k1"
+        },
+        "body": {
+          "text": "five"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r5",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi"
+            },
+            "chat": {
+              "id": "bot:b1:u1",
+              "type": "private"
+            },
+            "date": 1757376002,
+            "text": "five"
+          }
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/sendMessage",
-                  "headers": { "Idempotency-Key": "$notSame:k1" },
-                  "body": { "text": "six" } },
-      "respond": { "status": 200, "body": { "ok": true, "result": { "message_id": "r6", "from": { "id": "bot:b1", "name": "pepi" }, "chat": { "id": "bot:b1:u1", "type": "private" }, "date": 1757376003, "text": "six" } } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "headers": {
+          "Idempotency-Key": "$notSame:k1"
+        },
+        "body": {
+          "text": "six"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r6",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi"
+            },
+            "chat": {
+              "id": "bot:b1:u1",
+              "type": "private"
+            },
+            "date": 1757376003,
+            "text": "six"
+          }
+        }
+      }
     },
     {
-      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 7 } },
-      "respond": { "status": 200, "body": { "ok": true, "result": [] } }
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 7
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
     }
   ],
-
-  "assert": { "botStopped": false },
-  "run": { "timeoutMs": 3000 }
+  "assert": {
+    "botStopped": false
+  },
+  "run": {
+    "timeoutMs": 3000
+  }
 }

@@ -55,7 +55,9 @@ export class FakeServer {
       body: parseJson(raw),
     };
 
-    const exchange = this.exchanges[this.index];
+    const last = this.exchanges[this.exchanges.length - 1];
+    const steadyState = last?.repeat === true && this.index >= this.exchanges.length;
+    const exchange = steadyState ? last : this.exchanges[this.index];
     if (!exchange) {
       // Beyond the declared list. Recorded, then answered so the SDK does not
       // hang waiting: the case fails on the record, not on a timeout, because a
@@ -67,7 +69,7 @@ export class FakeServer {
     }
 
     this.observed.push(record);
-    this.index++;
+    if (!steadyState) this.index++;
     const { respond } = exchange;
 
     if (respond.delayMs) await sleep(respond.delayMs);
