@@ -182,6 +182,11 @@ a 409":
    out the 30-second maximum. For the SDK that is good operational news:
    restarting a bot is fast.
 
+**Verified live on 2026-09-09.** A smoke-test bot left polling was displaced by
+a second one and received a real `409 CONFLICT_POLLING` from the server; the SDK
+stopped, retried nothing, and reported which code it was. The whole of §3.1 is
+now evidence rather than a reading of the server's spec.
+
 **What the SDK must do with the `409`: stop, not retry.** It is terminal, like
 `401`. A client's natural reflex is to retry anything that looks transient, and
 here that reflex is catastrophic: two retrying instances enter an **eviction

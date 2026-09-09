@@ -257,11 +257,18 @@ languages.
    comments to English** (D5). Deliberately not done earlier: the file is in
    active use, and copying it then would have created two versions diverging from
    day one.
-7. `botsmith-sdk/go`, written looking at pepibot but not derived from it (§5.4 of
-   the contract).
-8. Go conformance runner, against **the same cases**.
-9. **Reconcile.** This is where the ambiguous cases surface. Fix the case first,
-   then the two implementations — in that order.
+7. ~~`botsmith-sdk/go`~~ **Done.**
+8. ~~Go conformance runner, against the same cases.~~ **Done**: 11/11, first run,
+   with no case edited. `TestRunnerDetectsAMismatch` proves that runner checks.
+9. **Reconcile.** Nothing to reconcile: no case turned out ambiguous.
+
+   That is a weaker result than it looks, and worth writing down honestly. Both
+   ports were written by the same author holding the same reading of the
+   contract, so the cross-check mostly proves the cases are **portable and
+   executable from two independent runners** — not that the contract is
+   complete. A third party writing the Go port would have been the stronger
+   test. What did hold up: the guarantees are expressible without depending on
+   one language's shape, and nothing in the case format leaked TypeScript.
 
 ### Delivery 3 — Python
 
