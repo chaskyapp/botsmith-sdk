@@ -63,7 +63,9 @@ class NaiveBot implements BotUnderTest {
           await sleep(50);
           continue;
         }
-        updates = (envelope.result ?? []) as typeof updates;
+        // Guarded only so a wrong-shaped body fails the CASE instead of killing
+        // the process. The naive bot is meant to be wrong, not to be a crash.
+        updates = Array.isArray(envelope.result) ? (envelope.result as typeof updates) : [];
       } catch (error) {
         // No redaction: the URL, and therefore the token, goes straight through.
         this.errors.push({ message: error instanceof Error ? `${error.message} ${this.url("getUpdates")}` : String(error) });

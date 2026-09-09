@@ -26,6 +26,16 @@ export async function runCase(testCase: ConformanceCase, factory: BotFactory): P
 
   let bot: BotUnderTest | null = null;
   const failures: Failure[] = [];
+
+  // A conformance runner executes untrusted code by definition: an SDK with a
+  // bug is the whole point. An unhandled rejection from the bot under test must
+  // fail THIS case and let the suite continue — otherwise one broken SDK hides
+  // every case after it, which is exactly when the report matters most.
+  const crashes: string[] = [];
+  const onCrash = (reason: unknown) => crashes.push(describe(reason));
+  process.on("unhandledRejection", onCrash);
+  process.on("uncaughtException", onCrash);
+
   try {
     bot = factory.create({
       baseUrl: server.baseUrl,
@@ -45,8 +55,13 @@ export async function runCase(testCase: ConformanceCase, factory: BotFactory): P
       /* stopping must never mask a real failure */
     }
     await server.stop();
+    process.off("unhandledRejection", onCrash);
+    process.off("uncaughtException", onCrash);
   }
 
+  for (const crash of crashes) {
+    failures.push(failure("crash", `the bot threw and did not handle it: ${crash}`));
+  }
   failures.push(...checkRequests(testCase, server));
   if (bot) failures.push(...checkAssertions(testCase, bot));
   return { case: testCase, failures };
@@ -99,11 +114,14 @@ function checkRequests(testCase: ConformanceCase, server: FakeServer): Failure[]
     }
   }
 
-  for (const extra of server.extras) {
+  if (server.extras.length > 0) {
+    const shown = server.extras.slice(0, 3).map((e) => `${e.method} ${redact(e.path)}`);
+    const rest = server.extras.length - shown.length;
     failures.push(
       failure(
-        "unexpected request",
-        `the SDK sent ${extra.method} ${redact(extra.path)} after the last declared exchange. ` +
+        "unexpected requests",
+        `the SDK sent ${server.extras.length} request(s) after the last declared exchange ` +
+          `(${shown.join(", ")}${rest > 0 ? `, +${rest} more` : ""}). ` +
           `The exchange list is exhaustive: nothing may follow it.`,
       ),
     );

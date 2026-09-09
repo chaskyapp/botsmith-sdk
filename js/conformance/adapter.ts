@@ -10,7 +10,7 @@ import type { HandlerSpec } from "./types.js";
  */
 export interface ReportedError {
   /** Envelope error_code when the failure came from the API, else undefined. */
-  code?: number;
+  code?: number | undefined;
   message: string;
 }
 

@@ -40,6 +40,23 @@ case can be satisfied by an SDK that is wrong in the opposite direction — one 
 retries everything passes `g7-500`, one that stops on everything passes `g7-401`.
 The pair is what pins the boundary.
 
+## What a runner must guarantee
+
+Learned the first time the runner met a broken SDK, and binding on the Go and
+Python runners too:
+
+- **Isolate the code under test.** A conformance runner executes untrusted code
+  by definition — an SDK with a bug is the entire point. An unhandled exception
+  from the bot must fail *that case* and let the suite continue. When the JS
+  runner first ran, a fixture crash killed the process at case 5 of 11 and hid
+  the remaining 6: precisely the moment the report matters most.
+- **Answer unexpected requests, do not hang on them.** When the SDK sends
+  something past the last exchange, record it *and* reply. Leaving it to time out
+  makes the case fail on a timeout, which hides *which* request was the extra one.
+- **Redact before printing.** The runner prints paths, and paths carry the token.
+- **Group repeated failures.** Five identical "unexpected request" lines are
+  noise; a count with the first few is information.
+
 ## Known gaps
 
 Declared rather than left to be noticed later:
