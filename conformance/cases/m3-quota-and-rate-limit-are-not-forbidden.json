@@ -1,0 +1,32 @@
+{
+  "id": "m3-quota-and-rate-limit-are-not-forbidden",
+  "kind": "management",
+  "contractVersion": "1.0",
+  "guarantee": "M2",
+  "title": "422 QUOTA_EXCEEDED and 429 TOO_MANY_ATTEMPTS are recoverable, not loss of access",
+  "why": "The server deliberately does NOT return 403 for these two. Its own comment says why: a frontend treats 403 as 'your administration was revoked' and tears down the session, while a quota reached is a normal, recoverable condition. Reporting either as forbidden lies to the user about what happened.",
+
+  "calls": [
+    { "method": "command", "args": { "command": "/newbot", "expectedRevision": 0 } },
+    { "method": "command", "args": { "command": "/newbot", "expectedRevision": 0 } }
+  ],
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands" },
+      "respond": { "status": 422, "body": { "ok": false, "error": { "code": "QUOTA_EXCEEDED" } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands" },
+      "respond": { "status": 429, "body": { "ok": false, "error": { "code": "TOO_MANY_ATTEMPTS" } } }
+    }
+  ],
+
+  "assert": {
+    "errorsReported": [
+      { "managementCode": "QUOTA_EXCEEDED", "accessLost": false },
+      { "managementCode": "TOO_MANY_ATTEMPTS", "accessLost": false }
+    ]
+  },
+  "run": { "timeoutMs": 3000 }
+}

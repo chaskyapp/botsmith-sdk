@@ -119,6 +119,64 @@ appears in anything the SDK hands back.
 The run ends when the exchange list is exhausted **and** the SDK is idle, or when
 the bot stops on its own, or at `timeoutMs`. Whichever comes first.
 
+## Management cases
+
+The runtime is a loop; management is REST with optimistic concurrency. A case
+for it declares **which methods to invoke, in order**, instead of starting a bot
+and waiting.
+
+```jsonc
+{
+  "id":   "m1-omits-optionals-never-sends-null",
+  "kind": "management",              // absent means "runtime"
+  "calls": [
+    { "method": "command",
+      "args": { "command": "/newbot", "expectedRevision": 0 } }
+  ],
+  "exchanges": [ /* same shape as a runtime case */ ],
+  "assert": { "errorsReported": [] }
+}
+```
+
+- `calls[].method` is the client method: `capability`, `bots`, `bot`,
+  `dialogue`, `command`, `grant`.
+- `calls[].args` are its named arguments, as the SDK exposes them.
+- `exchanges` and the matchers work exactly as above. `repeat`, `handlerRuns`
+  and `botStopped` do not apply: nothing polls.
+
+Management adds four assertion fields:
+
+| Field | Meaning |
+|---|---|
+| `errorsReported[].managementCode` | the string code from the envelope (`STALE_STATE`, …) |
+| `errorsReported[].retryable` | whether re-reading and retrying is the right response |
+| `errorsReported[].accessLost` | whether this means administration was revoked |
+| `secretReturnedOnce` / `secretNotIn` | the revealed token reaches the return value and nowhere else |
+
+`retryable` and `accessLost` look like they break the rule against asserting
+anything idiomatic, and they would if a case named an error class. They do not:
+each SDK's **adapter** translates its own representation into those two
+booleans, exactly as it already translates an error code today. The case states
+the semantics the contract requires; how a language spells them stays its own
+business.
+
+### Why these cases exist at all
+
+Most of G1-G9 belong to the runtime's loop. Management needs far fewer cases,
+but the ones it needs are load-bearing, because the server's decoder is strict
+in ways that are easy to violate differently in each language:
+
+- **An optional field is omitted, never sent as `null`.** The server rejects a
+  `null` even where the field is optional, and every language defaults
+  differently — Python serialises `None` as `null`, JavaScript drops `undefined`
+  but keeps `null`, Go omits a nil pointer with `omitempty`. One case pins it
+  for all three.
+- **Unknown and duplicate fields are rejected**, so an SDK must not "helpfully"
+  add anything to a body.
+- **`409 STALE_STATE` is retryable after re-reading**, while `409` on the
+  runtime means stop. Same number, opposite instruction — that is why the two
+  surfaces have separate error types (R-B in §6 of the contract).
+
 ## Rules for writing cases
 
 1. A case pins **one guarantee**. If it needs two, it is two cases.

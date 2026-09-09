@@ -1,0 +1,28 @@
+{
+  "id": "m2-stale-state-is-not-the-runtime-409",
+  "kind": "management",
+  "contractVersion": "1.0",
+  "guarantee": "M2",
+  "title": "A 409 STALE_STATE surfaces as a management error, distinct from the runtime's 409",
+  "why": "409 means STOP on the runtime (another instance evicted you) and RE-READ AND RETRY here. Same number, opposite instruction. If both surfaces shared an error type, an `if code == 409: retry` written for management and reused in the runtime puts two bots into an eviction war. This case pins that the management client raises its own error type carrying the string code, so that `if` cannot be written across both.",
+
+  "calls": [
+    { "method": "command", "args": { "command": "confirm", "expectedRevision": 3 } }
+  ],
+
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot-management/commands",
+        "body": { "command": "confirm", "expectedRevision": 3 }
+      },
+      "respond": { "status": 409, "body": { "ok": false, "error": { "code": "STALE_STATE" } } }
+    }
+  ],
+
+  "assert": {
+    "errorsReported": [ { "managementCode": "STALE_STATE", "retryable": true, "notContains": "{token}" } ]
+  },
+  "run": { "timeoutMs": 3000 }
+}
