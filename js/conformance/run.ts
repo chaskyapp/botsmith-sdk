@@ -14,6 +14,11 @@ async function main(): Promise<void> {
   const only = valueOf(args, "--only");
 
   const factory = await loadFactory(factoryArg);
+  // Management cases need their own client; a fixture run has none, and those
+  // cases report a clear setup failure rather than a confusing mismatch.
+  const managementFactory = factoryArg === DEFAULT_FACTORY
+    ? (await import("./management-sdk-adapter.js")).managementFactory
+    : undefined;
   // Without this line, "9 failed" reads as a broken SDK. It is a broken FIXTURE,
   // on purpose, and the run is measuring the runner rather than any SDK.
   const isFixture = factoryArg.includes("fixtures/");
@@ -36,7 +41,7 @@ async function main(): Promise<void> {
   const results: CaseResult[] = [];
   for (const file of selected) {
     const testCase = await loadCase(join(CASES_DIR, file));
-    const result = await runCase(testCase, factory);
+    const result = await runCase(testCase, factory, managementFactory);
     results.push(result);
     report(result);
   }

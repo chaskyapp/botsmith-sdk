@@ -36,10 +36,26 @@ export interface HandlerSpec {
   replyText?: string;
 }
 
+export interface ManagementCall {
+  method: "capability" | "bots" | "bot" | "dialogue" | "command" | "grant";
+  args?: Record<string, Json>;
+}
+
 export interface Assertions {
+  /** Management: the revealed token must come back from the call itself. */
+  secretReturnedOnce?: string;
+  /** Management: and appear in none of these places. */
+  secretNotIn?: ("errors" | "warnings" | "repr")[];
   botStopped?: boolean;
   handlerRuns?: { updateId: number; times: number }[];
-  errorsReported?: { code?: number; notContains?: string }[];
+  errorsReported?: {
+    code?: number;
+    /** Management's codes are strings, not numbers. */
+    managementCode?: string;
+    retryable?: boolean;
+    accessLost?: boolean;
+    notContains?: string;
+  }[];
   warnings?: { contains: string }[];
 }
 
@@ -49,7 +65,10 @@ export interface ConformanceCase {
   guarantee: string;
   title: string;
   why: string;
-  bot: {
+  /** Absent means "runtime". */
+  kind?: "runtime" | "management";
+  calls?: ManagementCall[];
+  bot?: {
     transport: "polling";
     options?: { limit?: number; timeoutSeconds?: number };
     handler: HandlerSpec;

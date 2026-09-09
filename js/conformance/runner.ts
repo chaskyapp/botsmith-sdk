@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { BotFactory, BotUnderTest } from "./adapter.js";
+import type { ManagementFactory, ManagementUnderTest } from "./management-adapter.js";
 import { FakeServer } from "./fake-server.js";
 import { failure, matchHeaders, matchPartial, type Captures } from "./matchers.js";
 import type { ConformanceCase, Failure, Json } from "./types.js";
@@ -20,7 +21,21 @@ export async function loadCase(path: string): Promise<ConformanceCase> {
   return JSON.parse(await readFile(path, "utf8")) as ConformanceCase;
 }
 
-export async function runCase(testCase: ConformanceCase, factory: BotFactory): Promise<CaseResult> {
+export async function runCase(
+  testCase: ConformanceCase,
+  factory: BotFactory,
+  managementFactory?: ManagementFactory,
+): Promise<CaseResult> {
+  if (testCase.kind === "management") {
+    if (!managementFactory) {
+      return {
+        case: testCase,
+        failures: [failure("setup", "this case is a management case but no management factory was supplied")],
+      };
+    }
+    return runManagementCase(testCase, managementFactory);
+  }
+
   const server = new FakeServer(testCase.exchanges);
   await server.start();
 
@@ -40,9 +55,9 @@ export async function runCase(testCase: ConformanceCase, factory: BotFactory): P
     bot = factory.create({
       baseUrl: server.baseUrl,
       token: TEST_TOKEN,
-      limit: testCase.bot.options?.limit,
-      timeoutSeconds: testCase.bot.options?.timeoutSeconds,
-      handler: testCase.bot.handler,
+      limit: testCase.bot?.options?.limit,
+      timeoutSeconds: testCase.bot?.options?.timeoutSeconds,
+      handler: testCase.bot?.handler ?? { kind: "noop" },
     });
     await bot.start();
     await waitForCompletion(bot, server, testCase.run?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
@@ -65,6 +80,96 @@ export async function runCase(testCase: ConformanceCase, factory: BotFactory): P
   failures.push(...checkRequests(testCase, server));
   if (bot) failures.push(...checkAssertions(testCase, bot));
   return { case: testCase, failures };
+}
+
+/**
+ * A management case invokes methods in order; nothing polls, so there is no
+ * loop to wait on and no steady state. The exchange list and every matcher work
+ * exactly as they do for the runtime — that reuse is why the two kinds share a
+ * format at all.
+ */
+async function runManagementCase(
+  testCase: ConformanceCase,
+  factory: ManagementFactory,
+): Promise<CaseResult> {
+  const server = new FakeServer(testCase.exchanges);
+  await server.start();
+  const failures: Failure[] = [];
+  let client: ManagementUnderTest | null = null;
+  try {
+    client = factory.create({ baseUrl: server.baseUrl });
+    for (const call of testCase.calls ?? []) {
+      await client.invoke(call.method, (call.args ?? {}) as Record<string, unknown>);
+    }
+  } catch (error) {
+    failures.push(failure("run", `the client threw out of a call: ${describe(error)}`));
+  } finally {
+    await server.stop();
+  }
+
+  failures.push(...checkRequests(testCase, server));
+  if (client) failures.push(...checkManagementAssertions(testCase, client));
+  return { case: testCase, failures };
+}
+
+function checkManagementAssertions(testCase: ConformanceCase, client: ManagementUnderTest): Failure[] {
+  const failures: Failure[] = [];
+  const want = testCase.assert;
+  if (!want) return failures;
+
+  for (const [i, expected] of (want.errorsReported ?? []).entries()) {
+    const actual = client.errors[i];
+    if (!actual) {
+      failures.push(failure("assert.errorsReported", `expected an error at position ${i}, none was reported`));
+      continue;
+    }
+    if (expected.managementCode !== undefined && actual.managementCode !== expected.managementCode) {
+      failures.push(
+        failure(
+          "assert.errorsReported",
+          `error #${i + 1}: expected code ${expected.managementCode}, got ${actual.managementCode}`,
+        ),
+      );
+    }
+    for (const field of ["retryable", "accessLost"] as const) {
+      if (expected[field] !== undefined && actual[field] !== expected[field]) {
+        failures.push(
+          failure(
+            "assert.errorsReported",
+            `error #${i + 1}: expected ${field}=${expected[field]}, got ${actual[field]}`,
+          ),
+        );
+      }
+    }
+  }
+  if ((want.errorsReported?.length ?? 0) === 0 && client.errors.length > 0) {
+    failures.push(
+      failure("assert.errorsReported", `expected no errors, got ${JSON.stringify(client.errors.map((e) => e.managementCode ?? e.message))}`),
+    );
+  }
+
+  if (want.secretReturnedOnce !== undefined) {
+    const returned = client.results.some((result) => JSON.stringify(result ?? null).includes(want.secretReturnedOnce!));
+    if (!returned) {
+      failures.push(failure("assert.secretReturnedOnce", "the revealed token never reached the caller"));
+    }
+    // The one response carrying a live token is response-only by the server's
+    // own design. If the SDK lets it reach a log line, an error, or its own
+    // representation, it undoes the only protection built for it.
+    const places: Record<string, string> = {
+      errors: JSON.stringify(client.errors),
+      warnings: JSON.stringify(client.warnings),
+      repr: client.describe(),
+    };
+    for (const place of want.secretNotIn ?? []) {
+      if (places[place]?.includes(want.secretReturnedOnce)) {
+        failures.push(
+          failure("assert.secretNotIn", `the revealed token LEAKED into ${place}; it must reach the return value only`),
+        );
+      }
+    }
+  }
+  return failures;
 }
 
 async function waitForCompletion(bot: BotUnderTest, server: FakeServer, timeoutMs: number): Promise<void> {
