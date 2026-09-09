@@ -1,61 +1,60 @@
-# SDK cliente de la Bot API de Chasky — Especificación
+# Chasky Bot API Client SDK — Specification
 
-Estado: **especificación. No hay código todavía y no debe haberlo hasta que las
-decisiones abiertas del §12 estén cerradas por el usuario.**
+Status: **specification. No code yet.** Every decision in §12 is closed, so
+implementation can start; §6 of `01-organization.md` has the work order.
 
-Fecha: 2026-09-08.
-Servidor de referencia: `backend-api-go`, rama `cc-jose-nieto/botapi`.
-Evidencia de campo: `~/Desktop/pepibot/main.go` (554 líneas, Go, solo stdlib),
-un cliente que corre a la vez contra Chasky y contra Telegram para comparar los
-dos contratos.
-
----
-
-## 1. Propósito
-
-Un autor de bot que hoy quiere hablar con Chasky tiene que escribir, a mano y
-antes de la primera línea de lógica propia:
-
-- el bucle de long-poll y su reintento,
-- la aritmética del `offset`,
-- la deduplicación por `update_id`,
-- la generación y el reuso de la `Idempotency-Key`,
-- la redacción del token en los errores del transporte,
-- el clamp de `limit`/`timeout` a los máximos del servidor,
-- y el mapeo de un envelope `{ok, result}` a errores tipados.
-
-Eso son las 554 líneas de pepibot **antes** de contestar un solo mensaje. Todo
-eso es infraestructura, no producto: cada autor lo va a reescribir igual, y cada
-uno se va a equivocar en los mismos cinco lugares.
-
-El SDK existe para que el autor escriba únicamente esto:
-
-> "cuando llegue un mensaje de texto, contestá X."
-
-Es exactamente el trabajo que `telegraf` o `python-telegram-bot` hacen para
-Telegram.
-
-### No-propósito
-
-- **No es un cliente de Telegram.** No se promete portabilidad de código escrito
-  para Telegram (§4).
-- **No vive en `backend-api-go`.** El SDD scopeó el consumidor externo fuera del
-  repo del servidor a propósito: meterlo adentro contamina la API con decisiones
-  que le corresponden a cada autor de bot.
-- **No inventa garantías que el servidor no da.** Todo lo que el servidor no
-  promete, el SDK lo delega de forma explícita y documentada (§8).
+Last updated: 2026-09-09.
+Reference server: `backend-api-go`, branch `cc-jose-nieto/botapi`.
+Field evidence: `~/Desktop/pepibot/main.go` (554 lines of Go, stdlib only), a
+client that runs against Chasky and Telegram simultaneously to compare the two
+contracts.
 
 ---
 
-## 2. El servidor tal como está hoy
+## 1. Purpose
 
-Lo que sigue es descriptivo, no aspiracional: es el contrato contra el que se
-escribe el SDK.
+A bot author who wants to talk to Chasky today has to write, by hand and before
+their first line of actual logic:
 
-### 2.1 Superficie del token (Bot API)
+- the long-poll loop and its retry,
+- the `offset` arithmetic,
+- deduplication by `update_id`,
+- generating and reusing the `Idempotency-Key`,
+- redacting the token out of transport errors,
+- clamping `limit`/`timeout` to the server's maximums,
+- and mapping an `{ok, result}` envelope to typed errors.
 
-Base local: `http://localhost:54250/api/v1` — todo el servidor vive bajo
-`/api/v1` porque nexus antepone `Settings.PathPrefix`.
+That is pepibot's 554 lines **before answering a single message**. All of it is
+infrastructure, not product: every author will rewrite the same thing, and every
+one of them will get the same five details wrong.
+
+The SDK exists so the author writes only this:
+
+> "when a text message arrives, reply X."
+
+That is exactly the job `telegraf` and `python-telegram-bot` do for Telegram.
+
+### Non-purpose
+
+- **It is not a Telegram client.** No portability is promised for code written
+  against Telegram (§4).
+- **It does not live in `backend-api-go`.** The SDD scoped the external consumer
+  out of the server repo deliberately: pulling it in would contaminate the API
+  with decisions that belong to each bot author.
+- **It invents no guarantee the server does not give.** Everything the server
+  does not promise is delegated explicitly and in writing (§8).
+
+---
+
+## 2. The server as it stands today
+
+What follows is descriptive, not aspirational: it is the contract the SDK is
+written against.
+
+### 2.1 Token surface (Bot API)
+
+Local base URL: `http://localhost:54250/api/v1` — the whole server lives under
+`/api/v1` because nexus prepends `Settings.PathPrefix`.
 
 ```
 POST <base>/bot<TOKEN>/getMe
@@ -64,53 +63,53 @@ POST <base>/bot<TOKEN>/sendMessage
 POST <base>/bot<TOKEN>/sendChatAction
 ```
 
-El token viaja **en la ruta** y es la **única** credencial. Estas rutas son
-públicas: no piden `x-secret` ni sesión. Formato del token:
-`bot:{uuid}:{secreto-hex-64}` — se parte en el **último** `:`, porque el `botID`
-ya contiene uno.
+The token travels **in the path** and is the **only** credential. These routes
+are public: they require neither `x-secret` nor a session. Token format:
+`bot:{uuid}:{64-hex-secret}` — split it on the **last** `:`, because the `botID`
+already contains one.
 
 Envelope:
 
 ```
-Éxito:  { "ok": true,  "result": ... }
-Error:  { "ok": false, "error_code": N, "description": "..." }
+Success:  { "ok": true,  "result": ... }
+Error:    { "ok": false, "error_code": N, "description": "..." }
 ```
 
-El `error_code` replica el status HTTP. `description` es un string estable en
-inglés, pensado para logs — **no** es mecanismo de control de flujo.
+`error_code` mirrors the HTTP status. `description` is a stable human-readable
+string meant for logs — it is **not** a flow-control mechanism.
 
-Códigos observados: `400` `BAD_REQUEST` / `TEXT_REQUIRED` /
-`ACTION_NOT_SUPPORTED` / `REPLY_TO_MESSAGE_NOT_FOUND`, `401` `TOKEN_INVALID`,
-`403` `BOT_SUSPENDED` / `CHAT_FORBIDDEN`, `404` `CHAT_NOT_FOUND`, `409`
-`CONFLICT_POLLING` (§3.1), `500` `INTERNAL_ERROR`.
+Observed codes: `400` `BAD_REQUEST` / `TEXT_REQUIRED` / `ACTION_NOT_SUPPORTED` /
+`REPLY_TO_MESSAGE_NOT_FOUND`, `401` `TOKEN_INVALID`, `403` `BOT_SUSPENDED` /
+`CHAT_FORBIDDEN`, `404` `CHAT_NOT_FOUND`, `409` `CONFLICT_POLLING` (§3.1), `500`
+`INTERNAL_ERROR`.
 
-Proyección de mensaje (la única, deliberadamente pobre — el `Message` de dominio
-tiene ~40 campos y ninguno más se filtra):
+Message projection (the only one, deliberately thin — the domain `Message` has
+~40 fields and none of the others leak):
 
 ```
 BotMessage { message_id, from{id, name}, chat{id, type}, date, text }
 ```
 
-`date` está en **segundos**, no milisegundos.
+`date` is in **seconds**, not milliseconds.
 
-`getMe` devuelve `{ id, is_bot: true, username, first_name }`.
+`getMe` returns `{ id, is_bot: true, username, first_name }`.
 
-Límites y defaults del servidor (configurables, estos son los valores por
-defecto): `BOTAPI_UPDATES_MAX_LIMIT=100`, `BOTAPI_UPDATES_MAX_TIMEOUT=30`
-segundos, `BOTAPI_STREAM_MAXLEN=10000`. En la request: `offset` ausente o `0` no
-confirma nada, `limit` por defecto `100`, `timeout` por defecto `0`. Valores
-negativos, tipos incorrectos y `limit:0` explícito son `400`; valores por encima
-del máximo se **clampean** en silencio.
+Server limits and defaults (configurable; these are the defaults):
+`BOTAPI_UPDATES_MAX_LIMIT=100`, `BOTAPI_UPDATES_MAX_TIMEOUT=30` seconds,
+`BOTAPI_STREAM_MAXLEN=10000`. Per request: `offset` absent or `0` acknowledges
+nothing, `limit` defaults to `100`, `timeout` defaults to `0`. Negative values,
+wrong types and an explicit `limit:0` are `400`; values above the maximum are
+**clamped silently**.
 
-### 2.2 Superficie de sesión humana
+### 2.2 Human-session surface
 
 ```
 POST <base>/bot/register                  (X-Botapi-Platform-Key, server-to-server)
-POST <base>/bots/{botID}/conversation     (sesión humana — el "/start")
-GET  <base>/bots/search/{query}           (sesión humana)
+POST <base>/bots/{botID}/conversation     (human session — the "/start")
+GET  <base>/bots/search/{query}           (human session)
 ```
 
-### 2.3 Superficie de BotSmith (gestión)
+### 2.3 BotSmith surface (management)
 
 ```
 GET  <base>/bot-management/capability
@@ -121,378 +120,363 @@ POST <base>/bot-management/commands
 PUT  <base>/bot-management/administrators/{id}
 ```
 
-Credenciales: **sesión humana (bearer o cookie) + `X-Secret`**. Nada que ver con
-el token del bot. Envelope distinto: `{ok, data}` en éxito y
-`{ok:false, error:{code}}` en error, con `no-store`.
+Credentials: **human session (bearer or cookie) + `X-Secret`**. Nothing to do
+with the bot token. Different envelope: `{ok, data}` on success and
+`{ok:false, error:{code}}` on failure, served `no-store`.
 
-Códigos: `INVALID_INPUT` 400, `UNAUTHORIZED` 401, `FORBIDDEN` 403, `NOT_FOUND`
-404, `STALE_STATE` 409, `QUOTA_EXCEEDED` 422, `TOO_MANY_ATTEMPTS` 429,
+Codes: `INVALID_INPUT` 400, `UNAUTHORIZED` 401, `FORBIDDEN` 403, `NOT_FOUND` 404,
+`STALE_STATE` 409, `QUOTA_EXCEEDED` 422, `TOO_MANY_ATTEMPTS` 429,
 `UNAVAILABLE`/`RECOVERY_REQUIRED` 503.
 
-`POST /commands` no es un CRUD: es una **máquina de estados conversacional** con
-control de concurrencia optimista. Body:
+`POST /commands` is not CRUD: it is a **conversational state machine** with
+optimistic concurrency control. Body:
 `{operationID, expectedRevision, command, value?, botID?, expectedCredentialVersion?}`.
-Vocabulario de comandos: `/newbot`, `/mybots`, `/help`, `/cancel`, `value`,
-`select`, `name`, `description`, `issue`, `rotate`, `revoke`, `archive`,
-`unarchive`, `confirm`.
+Command vocabulary: `/newbot`, `/mybots`, `/help`, `/cancel`, `value`, `select`,
+`name`, `description`, `issue`, `rotate`, `revoke`, `archive`, `unarchive`,
+`confirm`.
 
 ---
 
-## 3. Lo que pepibot descubrió y el SDK tiene que resolver
+## 3. What pepibot discovered, and the SDK has to solve
 
-Cada uno de estos seis puntos es una trampa que un autor pisa una vez, en
-producción, y tarda un rato en entender. Están en el orden en que duelen.
+Each of these six is a trap an author steps into once, in production, and spends
+a while understanding. They are ordered by how much they hurt.
 
-### 3.1 Un solo consumidor por bot — el servidor ahora expulsa
+### 3.1 One consumer per bot — the server now evicts
 
-**Esto cambió el 2026-09-08** (commit `d4526381` de `backend-api-go`, spec
-`docs/sdd/botapi/botsmith/14-poll-exclusion.md`). El texto viejo de esta sección
-describía el peor modo de falla del sistema; hoy describe un contrato.
+**This changed on 2026-09-08** (commit `d4526381` in `backend-api-go`, spec
+`docs/sdd/botapi/botsmith/14-poll-exclusion.md`). The previous text of this
+section described the system's worst failure mode; today it describes a contract.
 
-**Antes**: dos `getUpdates` simultáneos sobre el mismo bot **se repartían** los
-updates —cada camino recibía la mitad, sin error ni log—, porque los dos polls
-usaban el mismo nombre de consumidor y `XREADGROUP` reparte. Desde afuera se veía
-"un bot que a veces no responde", y no había nada en los logs que lo explicara.
+**Before**: two simultaneous `getUpdates` calls on the same bot **split** the
+updates — each path received half, with no error and no log — because both polls
+used the same consumer name and `XREADGROUP` distributes. From the outside it
+looked like "a bot that sometimes doesn't answer," and nothing in the logs
+explained it.
 
-**Ahora**: hay un cerrojo por bot (`botapi:poll:<botID>`) y `getUpdates` devuelve
-**`409 CONFLICT_POLLING`**. Chasky imita a Telegram, que corta con
+**Now**: there is a per-bot lock (`botapi:poll:<botID>`) and `getUpdates` returns
+**`409 CONFLICT_POLLING`**. Chasky mirrors Telegram, which cuts off with
 `409 Conflict: terminated by other getUpdates request`.
 
-Tres detalles del mecanismo que el SDK necesita saber, y que no se deducen de
-"hay un 409":
+Three details of the mechanism the SDK needs, none of which follow from "there is
+a 409":
 
-1. **El que llega DESPLAZA al que estaba.** El cerrojo se toma sin condición
-   (`SET` sin `NX`), así que **el `409` le llega al poll VIEJO**, no al nuevo. El
-   servidor lo eligió así porque el caso frecuente es un reinicio del bot, y
-   hacer esperar al proceso que acaba de arrancar sería un impuesto diario para
-   prevenir un accidente de configuración que se arregla una vez.
+1. **The arriving poll EVICTS the incumbent.** The lock is taken unconditionally
+   (`SET` without `NX`), so **the `409` goes to the OLD poll**, not the new one.
+   The server chose this because the common case is a bot restart, and making the
+   process that just booted wait would be a daily tax to prevent a configuration
+   accident that gets fixed once.
 
-   Consecuencia directa y nada obvia: **`start()` no es una operación inocente.**
-   Arrancar el SDK expulsa a quien esté polleando ese bot. En un despliegue con
-   dos réplicas, arrancar la segunda mata a la primera.
+   A direct and non-obvious consequence: **`start()` is not an innocent
+   operation.** Starting the SDK evicts whoever is polling that bot. In a
+   deployment with two replicas, starting the second kills the first.
 
-2. **Perder el poll NO pierde mensajes.** El poll desplazado devuelve **cero**
-   entradas —no las que ya había leído: entregar a medias sería el mismo reparto
-   silencioso con menos elementos— y esas entradas quedan **sin ACK**, así que las
-   recupera la instancia que lo desplazó. El SDK no tiene que hacer nada. El autor
-   lo va a preguntar igual, y por eso está documentado acá.
+2. **Losing the poll does NOT lose messages.** The evicted poll returns **zero**
+   entries — not the ones it had already read: delivering half would be the same
+   silent split with fewer elements — and those entries stay **unacknowledged**,
+   so the instance that evicted it picks them up. The SDK has to do nothing. The
+   author will ask anyway, which is why it is written down here.
 
-3. **El cerrojo tiene TTL corto y se renueva por tramo**, no dura el poll entero.
-   Un proceso que muere libera el bot en segundos en vez de esperar el timeout
-   máximo de 30 s. Para el SDK esto es una buena noticia operativa: reiniciar un
-   bot es rápido.
+3. **The lock has a short TTL and is renewed per slice**; it does not span the
+   whole poll. A process that dies frees the bot in seconds rather than waiting
+   out the 30-second maximum. For the SDK that is good operational news:
+   restarting a bot is fast.
 
-**Lo que el SDK debe hacer con el `409`: detenerse, no reintentar.** Es terminal,
-como el `401`. El reflejo natural de un cliente es reintentar cualquier error que
-parezca transitorio, y acá ese reflejo es catastrófico: dos instancias que
-reintentan entran en una **guerra de expulsiones** —cada una desplaza a la otra,
-ninguna llega a procesar nada— y el resultado es peor que el reparto silencioso
-que este cambio vino a arreglar. Está anotado como garantía **G7** (§8.1) y como
-caso obligatorio de conformidad.
+**What the SDK must do with the `409`: stop, not retry.** It is terminal, like
+`401`. A client's natural reflex is to retry anything that looks transient, and
+here that reflex is catastrophic: two retrying instances enter an **eviction
+war** — each displacing the other, neither processing anything — and the result
+is worse than the silent split this change was meant to fix. Recorded as
+guarantee **G7** (§8.1) and as a mandatory conformance case.
 
-**Y el mensaje importa.** El `409` **no** significa "configuración incorrecta":
-en un despliegue rolling es el flujo normal y correcto, y la instancia vieja debe
-morir limpia. El SDK dice *"otra instancia tomó el poll de este bot; esta se
-detiene"*, no *"error de configuración"*. Distinguir un deploy de un accidente no
-se puede hacer en el instante del `409` —son idénticos— y fingir que sí sería
-mentirle al autor.
+**And the message matters.** A `409` does **not** mean "misconfiguration": in a
+rolling deployment it is the normal, correct flow, and the old instance should
+die cleanly. The SDK says *"another instance took over polling for this bot; this
+one is stopping"*, not *"configuration error"*. Telling a deploy apart from an
+accident is impossible at the moment of the `409` — they are identical — and
+pretending otherwise would be lying to the author.
 
-### 3.2 El offset tiene que avanzar SIEMPRE
+### 3.2 The offset must ALWAYS advance
 
-Incluso para un update ya visto, o uno que el handler no pudo procesar, o uno que
-hizo explotar al handler. Si el offset solo avanza al tener éxito, el bot se
-atasca reintentando el mismo update para siempre, y —peor— nunca ve los que
-vienen atrás.
+Even for an update already seen, one the handler could not process, or one that
+blew the handler up. If the offset only advances on success, the bot gets stuck
+retrying the same update forever and — worse — never sees the ones behind it.
 
-Esta es la regla que más fácil se rompe cuando el autor la escribe a mano, porque
-"solo confirmo lo que procesé bien" suena a lo correcto. No lo es: el `offset` de
-Chasky **no** es un ack de negocio, es un cursor de lectura.
+This is the rule most easily broken when written by hand, because "I only
+acknowledge what I processed correctly" sounds right. It is not: Chasky's
+`offset` is **not** a business acknowledgement, it is a read cursor.
 
-### 3.3 La entrega es at-least-once
+### 3.3 Delivery is at-least-once
 
-El mismo `update_id` puede volver: el cliente se murió entre responder y avanzar
-el offset, o la entry quedó en el PEL. El `update_id` **no** se reasigna en la
-reentrega. Deduplicar es responsabilidad del cliente.
+The same `update_id` can come back: the client died between replying and
+advancing the offset, or the entry stayed in the PEL. The `update_id` is **not**
+reassigned on redelivery. Deduplication is the client's responsibility.
 
-### 3.4 `Idempotency-Key` nueva por mensaje lógico, la misma al reintentar ESE
+### 3.4 A fresh `Idempotency-Key` per logical message, the same one when retrying THAT message
 
-Es una extensión de Chasky; Telegram no conoce esta cabecera. Solo aplica a
-`sendMessage`, y está scopeada **por bot**, nunca por chat.
+It is a Chasky extension; Telegram does not know this header. It applies only to
+`sendMessage`, and is scoped **per bot**, never per chat.
 
-La trampa: reusar una key entre mensajes distintos hace que el servidor devuelva
-el resultado de la primera y **descarte el segundo en silencio**. La llamada
-responde `200` con un `BotMessage` válido. Parece que funcionó. No funcionó.
+The trap: reusing a key across different messages makes the server return the
+first result and **silently discard the second**. The call answers `200` with a
+valid `BotMessage`. It looks like it worked. It did not.
 
-Además, en el reintento la **key gana sobre el body**: si se reintenta la misma K
-con otro texto, el servidor devuelve el snapshot original antes de siquiera
-validar el contenido nuevo.
+Also, on a retry the **key wins over the body**: retrying the same K with
+different text returns the original snapshot before the new content is even
+validated.
 
-### 3.5 El token se filtra a los logs por el transporte
+### 3.5 The token leaks into logs through the transport
 
-Como viaja en la ruta, el cliente HTTP incrusta la URL completa en sus propios
-errores. Un `connection refused` alcanza para dejar la credencial escrita en un
-log. No hace falta que nadie loguee mal: alcanza con loguear el error.
+Because it travels in the path, the HTTP client embeds the full URL in its own
+errors. A `connection refused` is enough to write the credential into a log.
+Nobody has to log carelessly: logging the error is enough.
 
-El servidor ya redacta `/bot<token>/` en los suyos. **El cliente tiene que hacer
-lo mismo del lado de afuera**, y es responsabilidad del SDK, no del autor: el
-autor no sabe que el error trae una URL adentro.
+The server already redacts `/bot<token>/` in its own logs. **The client has to do
+the same on the outside**, and that is the SDK's job, not the author's: the
+author does not know the error carries a URL inside.
 
-### 3.6 Los identificadores son cadenas, y los campos se llaman distinto
+### 3.6 Identifiers are strings, and fields are named differently
 
-`chat.id`, `from.id` y `message_id` son **string** en Chasky y **número** en
-Telegram. El remitente es `from.name` en Chasky y `from.first_name` en Telegram.
+`chat.id`, `from.id` and `message_id` are **strings** in Chasky and **numbers** in
+Telegram. The sender is `from.name` in Chasky and `from.first_name` in Telegram.
 
-Consecuencia dura: **un SDK de Telegram no funciona contra Chasky sin
-modificarlo.** No alcanza con cambiar la URL base. Es la evidencia que decide la
-decisión de fondo del §4.
+The hard consequence: **a Telegram SDK does not work against Chasky without
+modification.** Changing the base URL is not enough. This is the evidence behind
+the foundational decision in §4.
 
-En pepibot esto se resolvió con un tipo `flexID` que recuerda la forma en que
-llegó el identificador y lo reemite igual. **Ese tipo es un artefacto de correr
-las dos plataformas en un mismo binario, y NO debe portarse al SDK** (§9).
+pepibot solved it with a `flexID` type that remembers the shape an identifier
+arrived in and re-emits it the same way. **That type is an artifact of running
+both platforms in one binary, and must NOT be ported to the SDK** (§9).
 
 ---
 
-## 4. Decisión de fondo — nativo de Chasky, no compatible con Telegram
+## 4. The foundational decision — Chasky-native, not Telegram-compatible
 
-**Recomendación: nativo.** Con una precisión que importa: nativo en los **tipos**,
-familiar en el **modelo mental**.
+**CLOSED (D2): native.** With a distinction that matters: native in the **types**,
+familiar in the **mental model**.
 
-### Por qué no compatible
+### Why not compatible
 
-Imitar la API de un SDK de Telegram promete una cosa —"portás tu bot casi sin
-tocarlo"— que el contrato no puede sostener. Los identificadores tienen otro
-tipo. Un `chat_id` numérico no encuentra nada en Chasky; uno entrecomillado lo
-rechaza Telegram. Sostener la fachada obliga a coerción por todos lados, y toda
-coerción de identificadores es un **error silencioso**: no tira excepción, apunta
-al chat equivocado o a ninguno.
+Mimicking a Telegram SDK's API promises something the contract cannot deliver —
+"port your bot almost untouched." The identifiers have a different type. A
+numeric `chat_id` finds nothing in Chasky; a quoted one is rejected by Telegram.
+Keeping up the façade forces coercion everywhere, and every identifier coercion
+is a **silent error**: it throws nothing, it points at the wrong chat or at none.
 
-Y la lista de diferencias no se agota en los tipos:
+And the list of differences does not stop at the types:
 
 | | Telegram | Chasky |
 |---|---|---|
-| `chat.id`, `from.id`, `message_id` | número | **string** |
-| nombre del remitente | `first_name` | **`name`** |
-| poll concurrente | `409` explícito | **`409` explícito** — ya coincide |
-| `Idempotency-Key` | no existe | requerida por disciplina |
-| `sendChatAction` | vocabulario amplio | **solo `typing`** |
-| adjuntos, media, botones | sí | **no en v1** |
-| `setWebhook` en la superficie del token | sí | **no, y a propósito** (§10) |
+| `chat.id`, `from.id`, `message_id` | number | **string** |
+| sender name | `first_name` | **`name`** |
+| concurrent poll | explicit `409` | **explicit `409`** — now matches |
+| `Idempotency-Key` | does not exist | required by discipline |
+| `sendChatAction` | broad vocabulary | **`typing` only** |
+| attachments, media, buttons | yes | **not in v1** |
+| `setWebhook` on the token surface | yes | **no, deliberately** (§11) |
 
-Un autor que trae un bot de Telegram y encuentra una API que se le parece pero
-falla distinto está peor que uno que encuentra una API honesta y distinta. La
-falsa familiaridad es más cara que la diferencia declarada.
+An author who brings a Telegram bot and finds an API that looks similar but fails
+differently is worse off than one who finds an honest, different API. False
+familiarity costs more than a declared difference.
 
-**Nota del 2026-09-08:** el `409` en poll concurrente pasó de diferencia a
-coincidencia (§3.1). Eso **no reabre esta decisión**. La fila que hace que un SDK
-de Telegram no funcione contra Chasky es la primera —`string` contra número—, no
-esta: una coincidencia más en una tabla de siete no cambia que los identificadores
-tengan otro tipo, y la coerción de identificadores sigue siendo un error
-silencioso. Lo que sí gana el `409` es que la **clasificación de errores** (§10.2)
-se acerca a la de Telegram, y eso abarata portar el manejo de errores. Es un
-ahorro real y no es la decisión de fondo.
+**Note (2026-09-08):** the concurrent-poll `409` went from difference to match
+(§3.1). That **does not reopen this decision**. The row that makes a Telegram SDK
+fail against Chasky is the first one — `string` versus number — not this one: one
+more match in a table of seven does not change that identifiers have a different
+type, and identifier coercion is still a silent error. What the `409` does buy is
+that **error classification** (§10.2) moves closer to Telegram's, which makes
+porting error handling cheaper. That is a real saving, and it is not the
+foundational decision.
 
-### Qué sí se toma prestado
+### What is borrowed
 
-El **modelo mental**, que es lo que realmente se porta: updates con un
-`update_id` monótono, `offset` como cursor, `chat_id` como destino, y
-composición por handlers (`bot.on(...)`, middlewares). Un autor de telegraf
-reconoce la forma en cinco minutos aunque no reuse una línea.
+The **mental model**, which is what actually ports: updates with a monotonic
+`update_id`, `offset` as a cursor, `chat_id` as a destination, and handler
+composition (`bot.on(...)`, middleware). A telegraf author recognises the shape
+in five minutes even though not one line is reused.
 
-Eso es el 80% del beneficio de portar, sin nada de la ficción de tipos.
-
----
-
-## 5. Decisión — los tres SDKs y su orden
-
-**CERRADA (2026-09-08): se hacen tres — TypeScript, Go y Python — en un monorepo,
-y el orden de entrega es TypeScript → Go → Python.**
-
-### 5.1 Por qué TypeScript primero
-
-1. **El público del SDK no es el equipo del backend.** Son terceros que escriben
-   bots. Las referencias del rubro —`telegraf`, `python-telegram-bot`— son JS y
-   Python.
-2. **El valor marginal es mayor en JS, y pepibot lo prueba.** Hoy un autor de Go
-   habla con Chasky en 554 líneas de biblioteca estándar, sin una dependencia, y
-   el archivo que lo demuestra ya existe. El autor de JS enfrenta esas mismas 554
-   líneas **más** el trabajo de descubrir solo las seis trampas del §3.
-3. **El resto del producto ya es JS.** Frontend Next.js, portal enterprise. Mismo
-   toolchain que el equipo ya opera.
-4. **El futuro webhook es Node.** Cuando exista egreso de webhooks (§11), el
-   handler HTTP del bot va a vivir mayoritariamente en un runtime serverless.
-
-Y una precisión que no es cosmética: se escribe **en TypeScript**, y los `.d.ts`
-publicados son **parte del contrato público**, no documentación. Que
-`sendChatAction({ action: "upload_photo" })` falle en el editor y no con un `400
-ACTION_NOT_SUPPORTED` en producción es la mitad del valor del SDK, porque la
-mitad de las trampas del §3 son de forma.
-
-### 5.2 Por qué Go segundo
-
-El argumento de adopción favorecía a Python —no tiene nada hoy, y los bots con
-LLM son casi todos Python—. Gana un argumento más urgente: **la suite de
-conformidad (§6) no prueba nada con un solo consumidor.**
-
-Una suite corrida por una sola implementación no valida el contrato: valida esa
-implementación contra sí misma. Recién con el **segundo** puerto aparecen los
-casos donde la suite era ambigua, donde el "contrato" era en realidad un detalle
-de cómo lo hizo el primero, y donde una garantía estaba escrita en prosa que
-admitía dos lecturas.
-
-Go llega segundo antes que Python porque **la mitad del trabajo ya está escrita**
-en pepibot y porque lo mantiene el mismo equipo que el servidor, sin cambiar de
-contexto. Es el segundo puerto más barato, y el segundo puerto es el que
-convierte la conformidad en algo real.
-
-### 5.3 Por qué Python tercero
-
-Es el que más adopción trae y el que menos riesgo de contrato corre, porque llega
-con el contrato ya sacudido por dos implementaciones. Llegar tercero no lo
-degrada: lo hace el más barato de los tres.
-
-### 5.4 Rol de pepibot
-
-**No se promueve a `sdk/go` y no se degrada a ejemplo.** Su función es distinta
-de la de un SDK: es el único cliente que corre contra **Chasky y Telegram a la
-vez**, y esa comparación es lo que hace visibles las diferencias del §4. Un SDK
-nativo de Chasky pierde exactamente esa capacidad.
-
-Queda en `reference/pepibot/` como **cliente de conformidad**: la implementación
-mínima en stdlib que verifica el contrato del servidor de punta a punta. El SDK
-de Go nace mirándolo, no siendo él (D5, §12).
+That is 80% of the porting benefit with none of the type fiction.
 
 ---
 
-## 6. Decisión — superficie mínima y empaquetado
+## 5. Decision — the three SDKs and their order
 
-**CERRADA: un artefacto publicable por lenguaje, con dos entrypoints separados.**
+**CLOSED (D1): three of them — TypeScript, Go and Python — in one monorepo,
+delivered in the order TypeScript → Go → Python.**
 
-### Entrypoint raíz — runtime del bot (primera entrega)
+### 5.1 Why TypeScript first
 
-Credencial: el token, en la ruta. Superficie: `getMe`, `getUpdates`,
-`sendMessage`, `sendChatAction`, más todo el andamiaje del §7.
+1. **The SDK's audience is not the backend team.** They are third parties writing
+   bots. The reference points in this space — `telegraf`, `python-telegram-bot` —
+   are JS and Python.
+2. **The marginal value is higher in JS, and pepibot proves it.** Today a Go
+   author talks to Chasky in 554 lines of standard library with no dependencies,
+   and the file that demonstrates it already exists. A JS author faces those same
+   554 lines **plus** discovering the six traps in §3 alone.
+3. **The rest of the product is already JS.** Next.js frontend, enterprise
+   portal. The same toolchain the team already operates.
+4. **The future webhook is Node.** When outbound webhooks exist (§11), the bot's
+   HTTP handler will mostly live in a serverless runtime.
 
-### Subpath `/management` — gestión (después, y solo si hay demanda)
+And a distinction that is not cosmetic: it is written **in TypeScript**, and the
+published `.d.ts` files are **part of the public contract**, not documentation.
+Having `sendChatAction({ action: "upload_photo" })` fail in the editor rather
+than as a `400 ACTION_NOT_SUPPORTED` in production is half the SDK's value,
+because half the traps in §3 are shape traps.
 
-Credencial: **sesión humana + `X-Secret`**. Superficie: los seis endpoints de
-`/bot-management`.
+### 5.2 Why Go second
 
-### Un paquete, dos entrypoints
+The adoption argument favoured Python — it has nothing today, and LLM-backed bots
+are mostly Python. A more urgent argument wins: **the conformance suite (§6 of
+`01-organization.md`) proves nothing with a single consumer.**
 
-**CERRADA (D13): un solo artefacto publicable por lenguaje, con dos puntos de
-entrada separados.** El paquete se llama como el producto —BotSmith (D9)— y las
-dos superficies son subpaths.
+A suite run by one implementation does not validate the contract; it validates
+that implementation against itself. Only the **second** port surfaces the cases
+where the suite was ambiguous, where the "contract" was really a detail of how
+the first one did it, and where a guarantee was written in prose that admitted
+two readings.
 
-| | Runtime | Gestión |
+Go comes before Python because **half the work is already written** in pepibot
+and because the same team that maintains the server maintains it, without a
+context switch. It is the cheapest second port, and the second port is what turns
+conformance into something real.
+
+### 5.3 Why Python third
+
+It brings the most adoption and carries the least contract risk, because it
+arrives with the contract already shaken out by two implementations. Arriving
+third does not diminish it: it makes it the cheapest of the three.
+
+### 5.4 pepibot's role
+
+**It is neither promoted to `go/` nor demoted to an example.** Its function
+differs from an SDK's: it is the only client that runs against **Chasky and
+Telegram at once**, and that comparison is what makes the differences in §4
+visible. A Chasky-native SDK loses exactly that capability.
+
+It lives in `reference/pepibot/` as the **conformance client**: the minimal
+stdlib implementation that exercises the server contract end to end. The Go SDK
+is written looking at it, not derived from it (D5, §12).
+
+---
+
+## 6. Decision — minimal surface and packaging
+
+**CLOSED (D13): one publishable artifact per language, with two separate
+entrypoints.** The artifact is named after the product — BotSmith (D9) — and the
+two surfaces are subpaths.
+
+| | Runtime | Management |
 |---|---|---|
 | npm | `@chasky/botsmith` | `@chasky/botsmith/management` |
 | Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/management` |
 | PyPI | `chasky_botsmith` | `chasky_botsmith.management` |
 
-Dos ventajas sobre publicar paquetes separados: el nombre del producto **es** el
-nombre del paquete, y los tres ecosistemas quedan simétricos. En Go un módulo con
-subpaquete ya era lo natural; ahora npm y PyPI lo espejan en vez de inventar cada
-uno su forma.
+**Root entrypoint — the bot runtime (first delivery).** Credential: the token, in
+the path. Surface: `getMe`, `getUpdates`, `sendMessage`, `sendChatAction`, plus
+all the scaffolding in §7.
 
-### Por qué las dos superficies siguen separadas por dentro
+**`/management` subpath — management (later, and only on demand).** Credential:
+**human session + `X-Secret`**. Surface: the six `/bot-management` endpoints.
 
-Compartir el artefacto **no** las hace una sola cosa. Siguen siendo dos sistemas
-distintos que casualmente hablan del mismo objeto, y el contraste está verificado
-contra el servidor:
+Two advantages over publishing separate packages: the product's name **is** the
+package's name, and the three ecosystems come out symmetric. In Go, a module with
+a subpackage was already the natural shape; now npm and PyPI mirror it instead of
+each inventing its own.
 
-| | Runtime | Gestión |
+### Why the two surfaces stay separate on the inside
+
+Sharing an artifact does **not** make them one thing. They remain two distinct
+systems that happen to talk about the same object, and the contrast is verified
+against the server:
+
+| | Runtime | Management |
 |---|---|---|
-| Credencial | token en la **ruta** | sesión humana **+** `X-Secret` |
-| Ruta | `/bot<TOKEN>/sendMessage` | `/bot-management/commands` |
-| Auth del servidor | `IsPublic: true, NoRequiresAuthentication: true` | middleware de sesión + secreto de API |
-| Envelope éxito | `{ok, result}` | `{ok, data}` |
-| Envelope error | `{ok:false, error_code, description}` | `{ok:false, error:{code}}` |
-| Tipo del código de error | **número** (`409`) | **string** (`"STALE_STATE"`) |
-| Forma | REST con métodos | máquina de estados con CAS |
-| Quién lo corre | el proceso del bot, 24/7 | un humano, una vez |
+| Credential | token in the **path** | human session **+** `X-Secret` |
+| Route | `/bot<TOKEN>/sendMessage` | `/bot-management/commands` |
+| Server auth | `IsPublic: true, NoRequiresAuthentication: true` | session middleware + API secret |
+| Success envelope | `{ok, result}` | `{ok, data}` |
+| Error envelope | `{ok:false, error_code, description}` | `{ok:false, error:{code}}` |
+| Error code type | **number** (`409`) | **string** (`"STALE_STATE"`) |
+| Shape | REST with methods | state machine with CAS |
+| Who runs it | the bot process, 24/7 | a human, once |
 
-De ahí salen **cuatro requisitos de implementación**, no sugerencias. Son lo que
-hace que un artefacto compartido no reintroduzca los problemas que la separación
-evitaba:
+From that come **four implementation requirements**, not suggestions. They are
+what keeps a shared artifact from reintroducing the problems separation avoided:
 
-**R-A. Constructores separados, jamás uno que acepte las dos credenciales.**
-`createBot({ token })` y `createManagementClient({ session, apiSecret })`. Nunca
-un constructor único que reciba token *o* sesión+secreto: ese era el riesgo real,
-y sobrevive intacto dentro de un solo paquete si se lo permite. Con dos
-constructores, mandar el `X-Secret` desde el proceso del bot vuelve a ser algo
-que hay que escribir a propósito.
+**R-A. Separate constructors — never one that accepts both credentials.**
+`createBot({ token })` and `createManagementClient({ session, apiSecret })`.
+Never a single constructor taking token *or* session+secret: that was the real
+risk, and it survives intact inside one package if allowed. With two
+constructors, sending the `X-Secret` from the bot process is something you have
+to write on purpose again.
 
-Importa por la asimetría del daño: un **token** filtrado deja mandar mensajes como
-ese bot —malo, acotado, se cierra rotando—; el **`X-Secret`** es un secreto de
-*plataforma*, y no es el mismo incidente.
+It matters because the damage is asymmetric: a leaked **token** lets an attacker
+send messages as that bot — bad, bounded, closed by rotating; the **`X-Secret`**
+is a *platform* secret, and that is not the same incident.
 
-**R-B. Tipos de error distintos por superficie.** `ChaskyApiError` (runtime,
-`code` numérico) y `ManagementError` (gestión, `code` string). No comparten clase
-base con un campo `code` común.
+**R-B. Distinct error types per surface.** `ChaskyApiError` (runtime, numeric
+`code`) and `ManagementError` (management, string `code`). They share no base
+class carrying a common `code` field.
 
-Es el requisito que neutraliza el peor riesgo de compartir paquete:
+This is the requirement that neutralises the worst risk of sharing a package:
 
-| `409` en… | Código | Significa | El cliente debe |
+| `409` on… | Code | Means | The client must |
 |---|---|---|---|
-| Runtime | `CONFLICT_POLLING` | otra instancia te desplazó | **detenerse**, jamás reintentar |
-| Gestión | `STALE_STATE` | tu `expectedRevision` está viejo | **releer y reintentar** |
+| Runtime | `CONFLICT_POLLING` | another instance evicted you | **stop**, never retry |
+| Management | `STALE_STATE` | your `expectedRevision` is stale | **re-read and retry** |
 
-**Mismo número, instrucción opuesta.** Con un tipo de error compartido, un
-`if (err.code === 409) retry()` escrito para la gestión y reusado en el runtime
-mete a dos instancias en la guerra de expulsiones del §3.1. Con tipos distintos,
-ese `if` no compila contra la superficie equivocada. Los envelopes ya son
-distintos, así que los tipos separados salen del contrato, no de la disciplina.
+**Same number, opposite instruction.** With a shared error type, an
+`if (err.code === 409) retry()` written for management and reused in the runtime
+puts two instances into the eviction war of §3.1. With distinct types, that `if`
+does not compile against the wrong surface. The envelopes already differ, so
+separate types fall out of the contract rather than out of discipline.
 
-**R-C. El runtime no importa nada del subpath de gestión.** Verificable con un
-test, no con una convención. Así el código de gestión no entra al bundle de quien
-solo corre un bot, y la dirección de la dependencia queda escrita.
+**R-C. The runtime imports nothing from the management subpath.** Verifiable with
+a test, not a convention. That keeps management code out of the bundle for anyone
+who only runs a bot, and writes the dependency direction down.
 
-**R-D. Lo poco que comparten vive en el módulo interno** (`core/`, `internal/`,
-`_core/`): redacción del token, backoff, cliente HTTP. Nunca envelopes, nunca
-tipos de error, nunca credenciales. **Si ese módulo empieza a crecer, es señal de
-que algo que debía quedar separado se está filtrando.**
+**R-D. What little they share lives in the internal module** (`core/`,
+`internal/`, `_core/`): token redaction, backoff, HTTP client. Never envelopes,
+never error types, never credentials. **If that module starts growing, it is a
+sign that something meant to stay separate is leaking.**
 
-### Orden de entrega
+### Delivery order
 
-El runtime va primero y la gestión después, aunque viajen en el mismo artefacto:
-el subpath puede aparecer en una versión posterior sin romper a nadie.
+The runtime ships first and management later, even though they travel in the same
+artifact: the subpath can appear in a later version without breaking anyone.
 
-**Por qué BotSmith no es urgente:** casi todos los autores crean el bot **una
-vez**, a mano, en el portal. La automatización por código sirve para un caso
-concreto —CI que provisiona bots por entorno— y hasta que ese caso exista es
-superficie que se mantiene sin usarse.
+**Why BotSmith is not urgent:** almost every author creates the bot **once**, by
+hand, in the portal. Automating it serves one concrete case — CI provisioning
+bots per environment — and until that case exists it is surface being maintained
+unused.
 
-### Nombre y estándar
+### Naming standard
 
-El artefacto se llama como el producto —**BotSmith**, D9— y las superficies son
-subpaths debajo. El scope `@chasky/` de npm está **confirmado disponible**
-(2026-09-08); los nombres concretos están en la tabla de "Un paquete, dos
-entrypoints", arriba.
-
-Para cualquier subpath futuro, el estándar es **el rol en una palabra, en el
-idioma del contrato**: `management` porque espeja `/bot-management`, que es la
-ruta que consume. No se inventa vocabulario nuevo cuando el servidor ya nombró
-la superficie.
+For any future subpath the standard is **the role in one word, in the contract's
+own vocabulary**: `management` because it mirrors `/bot-management`, the route it
+consumes. No new vocabulary is invented when the server already named the
+surface.
 
 ---
 
-## 7. Superficie de la API del SDK
+## 7. The SDK's API surface
 
-Boceto de contrato, no implementación: firmas y tipos, sin cuerpos. Sirve para
-discutir la forma; los nombres finales se cierran junto con el §12.
+A contract sketch, not an implementation: signatures and types, no bodies.
 
-Está escrito en TypeScript porque es la primera entrega (§5). **Go y Python NO lo
-transliteran**: portan los invariantes y adoptan la forma de su ecosistema. Qué
-es invariante y qué es idiomático está en `01-organizacion.md` §3, y es la regla
-que impide que el SDK de Python parezca TypeScript mal traducido.
+It is written in TypeScript because that is the first delivery (§5). **Go and
+Python do NOT transliterate it**: they port the invariants and adopt their own
+ecosystem's shape. What is invariant and what is idiomatic lives in
+`01-organization.md` §3, and it is the rule that keeps the Python SDK from
+reading like badly translated TypeScript.
 
-### 7.1 Tipos del dominio
+### 7.1 Domain types
 
 ```ts
-type ChatID    = string;  // "bot:{botID}:{userID}"  — SIEMPRE string
-type UserID    = string;  // "bot:{uuid}" o el id del humano
+type ChatID    = string;  // "bot:{botID}:{userID}"  — ALWAYS a string
+type UserID    = string;  // "bot:{uuid}" or the human's id
 type MessageID = string;
-type UpdateID  = number;  // el ÚNICO numérico. Ver §9.
+type UpdateID  = number;  // the ONLY numeric one. See §9.
 
 interface BotUser    { id: UserID; name: string }
 interface Chat       { id: ChatID; type: string }
@@ -501,15 +485,15 @@ interface Update     { updateId: UpdateID; message?: BotMessage }
 interface BotIdentity { id: UserID; isBot: true; username: string; displayName: string }
 ```
 
-`date` llega en segundos y se expone como `Date`. `displayName` se mapea desde el
-`first_name` del servidor: esa asimetría —`first_name` a la Telegram en `getMe`,
-`name` a la Chasky en `from`— es una inconsistencia del servidor y el SDK la
-absorbe en vez de propagarla (pedido S2 en §13).
+`date` arrives in seconds and is exposed as a `Date`. `displayName` is mapped from
+the server's `first_name`: that asymmetry — Telegram-style `first_name` in
+`getMe`, Chasky-style `name` in `from` — is a server inconsistency, and the SDK
+absorbs it instead of propagating it (request S2 in §13).
 
-### 7.2 Cliente crudo
+### 7.2 Raw client
 
-Un envoltorio 1:1 de los cuatro métodos, sin bucle. Es lo que usa el runtime por
-dentro, y lo que necesita quien quiere control total.
+A 1:1 wrapper over the four methods, with no loop. It is what the runtime uses
+underneath, and what anyone wanting full control needs.
 
 ```ts
 class ChaskyBotClient {
@@ -525,401 +509,382 @@ class ChaskyBotClient {
 }
 ```
 
-`action` es un literal `"typing"` y no un string: el vocabulario de Telegram es
-válido en Telegram y `400 ACTION_NOT_SUPPORTED` acá. Que el compilador lo diga
-antes que el servidor es gratis.
+`action` is the literal `"typing"` and not a string: Telegram's vocabulary is
+valid in Telegram and `400 ACTION_NOT_SUPPORTED` here. Having the compiler say so
+before the server does is free.
 
-### 7.3 Runtime — lo que la mayoría va a usar
+### 7.3 Runtime — what most people will use
 
 ```ts
 const bot = createBot({
   token: process.env.CHASKY_BOT_TOKEN!,
-  baseUrl: process.env.CHASKY_API,          // default: producción
-  transport: polling({ limit: 50, timeoutSeconds: 25 }),  // hoy el único (§10)
+  baseUrl: process.env.CHASKY_API,          // default: production
+  transport: polling({ limit: 50, timeoutSeconds: 25 }),  // the only one today (§11)
 });
 
-bot.command("start", ctx => ctx.reply("Hola, soy pepi."));
-bot.on("text",       ctx => ctx.reply(`Dijiste: ${ctx.message.text}`));
+bot.command("start", ctx => ctx.reply("Hi, I'm pepi."));
+bot.on("text",       ctx => ctx.reply(`You said: ${ctx.message.text}`));
 
-bot.onError(err => logger.error(err));       // ya viene redactado (§10.3 / §9)
-bot.onFatal(err => process.exit(1));         // 401/403 terminal: el bot no sigue
+bot.onError(err => logger.error(err));       // already redacted (§10.3)
+bot.onFatal(err => process.exit(1));         // 401/403/409: the bot does not continue
 
 await bot.start();
-await bot.stop();                            // corta el long-poll en vuelo
+await bot.stop();                            // cuts the in-flight long poll
 ```
 
-`ctx` trae el update, el mensaje, el `chatId`, el cliente crudo, y los atajos
-`reply` (que es `sendMessage` al chat del update, con `Idempotency-Key`
-administrada) y `typing`.
+`ctx` carries the update, the message, the `chatId`, the raw client, and the
+shortcuts `reply` (a `sendMessage` to the update's chat, with a managed
+`Idempotency-Key`) and `typing`.
 
-**Un detalle del dominio que el SDK debe reflejar:** un bot **no puede iniciar**
-una conversación. Solo puede responder en un chat que ya conoce, porque la
-conversación la crea la apertura humana (`POST /bots/{botID}/conversation`). El
-`chatId` se aprende de los updates. Un método que sugiera "mandale un mensaje a
-este usuario" sería una mentira de API; si el SDK expone un envío fuera de
-handler, tiene que pedir un `chatId` que el autor haya guardado él.
-
----
-
-## 8. Semánticas: lo que el SDK garantiza y lo que delega
-
-Esta es la sección que hace del SDK algo más que un envoltorio de `fetch`, y la
-que hay que leer entera antes de escribir un bot.
-
-### 8.1 Garantiza
-
-- **G1 — Un solo poll en vuelo por instancia.** `start()` sobre una instancia ya
-  arrancada es un error inmediato y local, no un bot que recibe la mitad de los
-  mensajes.
-- **G2 — El offset avanza siempre.** Se calcula `max(update_id) + 1` sobre el
-  lote **recibido**, y se manda en el poll siguiente pase lo que pase con los
-  handlers: excepción, timeout, rechazo, update ya visto. El avance es del
-  transporte, no del negocio.
-- **G3 — Dedup por `update_id`, con un umbral.** Se descarta todo
-  `update_id <= lastSeen`, y `lastSeen` es **un solo entero**: no hace falta
-  ninguna estructura de datos. El servidor entrega en orden ascendente estricto y
-  no emite identificadores regresivos, así que un `update_id` por debajo del
-  umbral es **siempre** un duplicado (D6, §12 — verificado contra el código).
-  pepibot usa un `map` que crece para siempre; en un proceso que vive meses eso
-  es una fuga, y el umbral la elimina de raíz.
-
-  Ese entero es **el mismo** que alimenta el offset: `offset == lastSeen + 1` en
-  todo momento (D7, §12). El SDK guarda un número, no dos.
-- **G4 — `Idempotency-Key` administrada.** Una key nueva por mensaje lógico, la
-  **misma** en cada reintento interno de ese envío. El autor nunca la escribe ni
-  la ve. Si la fuente de aleatoriedad falla, **no se envía**: mandar sin key es
-  peor que no mandar, porque un reintento crearía un duplicado.
-- **G5 — Redacción del token en todo error que salga del SDK.** Incluidos los del
-  transporte, y recursivamente en `cause`, `stack` y cualquier campo que traiga
-  una URL.
-- **G6 — Clamp de `limit` y `timeout`.** Un `timeout: 60` razonable no debe
-  convertirse en un `400`; se recorta al máximo del servidor y se emite un aviso.
-  Los valores que el servidor rechaza de plano —negativos, `limit: 0`— se
-  rechazan en el SDK, con el motivo, antes de gastar una request.
-- **G7 — Reintento con backoff en lo transitorio, corte en lo terminal.** `401`,
-  `403 BOT_SUSPENDED` y **`409 CONFLICT_POLLING`** detienen el bot y disparan
-  `onFatal`: reintentar un token revocado es ruido infinito, y reintentar un
-  `409` es una **guerra de expulsiones** en la que dos instancias se desplazan
-  mutuamente y ninguna procesa nada (§3.1). Red, `5xx` y timeouts reintentan con
-  backoff exponencial y jitter.
-- **G8 — Cancelación limpia.** `stop()` aborta el long-poll en vuelo; no espera
-  hasta 30 segundos a que venza el deadline del servidor.
-- **G9 — Los identificadores se reemiten tal cual llegaron.** El SDK nunca
-  convierte un id (§9).
-
-### 8.2 Delega — explícitamente, y hay que leerlo
-
-- **L1 — Exactly-once no existe.** El servidor no lo promete y el SDK no lo puede
-  inventar. Si un handler tiene efectos hacia afuera —cobrar, mandar un mail,
-  crear un ticket— la idempotencia de **ese** efecto es del autor. G3 reduce los
-  duplicados; no los elimina.
-- **L2 — Persistencia del offset entre reinicios.** Por defecto el offset vive en
-  memoria: al reiniciar, el servidor reentrega el PEL y el bot vuelve a ver
-  updates ya procesados. Se expone un gancho `OffsetStore` opcional —`load()` /
-  `save(n)`, invocado una vez por lote— y **queda documentado que el default
-  reprocesa** (D7, §12, cerrada).
-- **L3 — Un solo proceso por bot.** G1 vale **por instancia**: el SDK no puede
-  ver otra réplica. **Desde el 2026-09-08 el servidor sí la rechaza** con un
-  `409` (§3.1), así que esto dejó de ser el peor modo de falla del sistema —era
-  silencioso, ahora es ruidoso— y pasó a ser una condición operativa normal.
-
-  Lo que queda delegado es **decidir cuántos procesos corren**. El servidor deja
-  polleando al último que arrancó; si el despliegue levanta dos réplicas, una va
-  a morir con `409` cada vez. El SDK reporta el hecho; que haya una sola es del
-  despliegue.
-- **L4 — La retención del stream.** `BOTAPI_STREAM_MAXLEN=10000` por bot, y el
-  `XTRIM` puede llevarse incluso updates no confirmados. Un bot caído más tiempo
-  del que cubre esa ventana pierde updates. Es operación, no SDK.
-- **L5 — El significado.** Qué contestar, cuándo y con qué texto.
+**A domain detail the SDK must reflect:** a bot **cannot start** a conversation.
+It can only reply in a chat it already knows, because the conversation is created
+by the human opener (`POST /bots/{botID}/conversation`). The `chatId` is learned
+from updates. A method suggesting "send this user a message" would be an API lie;
+if the SDK exposes sending outside a handler, it must ask for a `chatId` the
+author stored themselves.
 
 ---
 
-## 9. Identificadores
+## 8. Semantics: what the SDK guarantees and what it delegates
 
-**Regla única: en Chasky todos los identificadores son `string`, y el SDK nunca
-los convierte.** Los recibe string, los guarda string, los reemite string.
+This is the section that makes the SDK more than a `fetch` wrapper, and the one
+to read in full before writing a bot.
 
-`chat.id` tiene forma `bot:{botID}:{userID}` y `from.id` tiene forma `bot:{uuid}`
-para el bot. **Eso es estructura observable, no contrato**: el SDK no parsea ids
-para deducir nada, igual que el servidor —que tiene la regla explícita de no
-parsear ids para autorizar. Un id es una etiqueta opaca.
+### 8.1 Guarantees
 
-**`flexID` no se porta.** El tipo de pepibot que recuerda si el id llegó como
-cadena o como número resuelve un problema que solo existe cuando un mismo binario
-habla con Chasky y con Telegram. En un SDK nativo de Chasky ese problema no
-existe, y copiarlo sería arrastrar una solución sin su problema: agrega un tipo
-propio donde alcanza `string`, y le pide al autor pensar en una ambigüedad que su
-plataforma no tiene.
+- **G1 — One in-flight poll per instance.** Calling `start()` on an
+  already-started instance is an immediate local error, not a bot receiving half
+  its messages.
+- **G2 — The offset always advances.** It is computed as `max(update_id) + 1`
+  over the **received** batch and sent on the next poll regardless of what
+  happened to the handlers: exception, timeout, rejection, already-seen update.
+  Advancing belongs to the transport, not to the business logic.
+- **G3 — Deduplication by `update_id`, using a threshold.** Everything with
+  `update_id <= lastSeen` is discarded, and `lastSeen` is **a single integer**:
+  no data structure is needed. The server delivers in strictly ascending order
+  and never emits regressive identifiers, so an `update_id` below the threshold
+  is **always** a duplicate (D6, §12 — verified against the code). pepibot uses a
+  `map` that grows forever; in a process that lives for months that is a leak,
+  and the threshold removes it at the root.
 
-**`update_id` es la única excepción numérica**, y merece su párrafo. Es un `int64`
-del lado del servidor (`INCR botapi:seq:{botID}`, uno por bot, empezando en cero).
-En JS los enteros son exactos hasta 2^53; un `int64` real no entra. En la
-práctica un contador por bot no se acerca ni de lejos a ese techo, así que se
-representa como `number`. **Esto queda escrito acá para que nadie lo "arregle" a
-`BigInt` sin saber por qué, y para que si algún día el servidor cambia el
-generador de secuencia —a un snowflake, a un timestamp— esta decisión se
-reabra.** Los gaps en la secuencia son válidos y esperables; el SDK no debe
-tratarlos como pérdida.
+  That integer is **the same one** that feeds the offset: `offset == lastSeen + 1`
+  at all times (D7, §12). The SDK stores one number, not two.
+- **G4 — Managed `Idempotency-Key`.** A fresh key per logical message, the
+  **same** one on every internal retry of that send. The author never writes it
+  or sees it. If the randomness source fails, **nothing is sent**: sending
+  without a key is worse than not sending, because a retry would create a
+  duplicate.
+- **G5 — Token redaction on every error leaving the SDK.** Including transport
+  errors, and recursively through `cause`, `stack` and any field carrying a URL.
+- **G6 — Clamping `limit` and `timeout`.** A reasonable `timeout: 60` must not
+  turn into a `400`; it is clamped to the server's maximum and a warning is
+  emitted. Values the server rejects outright — negatives, `limit: 0` — are
+  rejected in the SDK, with the reason, before spending a request.
+- **G7 — Backoff retry on the transient, a hard stop on the terminal.** `401`,
+  `403 BOT_SUSPENDED` and **`409 CONFLICT_POLLING`** stop the bot and fire
+  `onFatal`: retrying a revoked token is infinite noise, and retrying a `409` is
+  an **eviction war** where two instances displace each other and neither
+  processes anything (§3.1). Network errors, `5xx` and timeouts retry with
+  exponential backoff and jitter.
+- **G8 — Clean cancellation.** `stop()` aborts the in-flight long poll; it does
+  not wait up to 30 seconds for the server's deadline to expire.
+- **G9 — Identifiers are re-emitted exactly as received.** The SDK never converts
+  an id (§9).
+
+### 8.2 Delegated — explicitly, and worth reading
+
+- **L1 — Exactly-once does not exist.** The server does not promise it and the
+  SDK cannot invent it. If a handler has outward effects — charging, sending
+  mail, opening a ticket — the idempotency of **that** effect is the author's.
+  G3 reduces duplicates; it does not eliminate them.
+- **L2 — Offset persistence across restarts.** By default the offset lives in
+  memory: on restart the server redelivers the PEL and the bot sees already
+  processed updates again. An optional `OffsetStore` hook is exposed — `load()` /
+  `save(n)`, invoked once per batch — and **the default's reprocessing is
+  documented** (D7, §12).
+- **L3 — One process per bot.** G1 holds **per instance**: the SDK cannot see
+  another replica. **Since 2026-09-08 the server does reject it** with a `409`
+  (§3.1), so this stopped being the system's worst failure mode — it was silent,
+  now it is loud — and became a normal operational condition.
+
+  What stays delegated is **deciding how many processes run**. The server leaves
+  the most recently started one polling; if the deployment brings up two
+  replicas, one will die with a `409` every time. The SDK reports the fact;
+  keeping it to one is the deployment's job.
+- **L4 — Stream retention.** `BOTAPI_STREAM_MAXLEN=10000` per bot, and `XTRIM`
+  can take unacknowledged updates with it. A bot down for longer than that window
+  loses updates. That is operations, not SDK.
+- **L5 — Meaning.** What to reply, when, and with what text.
 
 ---
 
-## 10. Errores y redacción
+## 9. Identifiers
 
-### 10.1 Tipado
+**One rule: in Chasky every identifier is a `string`, and the SDK never converts
+them.** It receives strings, stores strings, re-emits strings.
+
+`chat.id` has the shape `bot:{botID}:{userID}` and `from.id` has the shape
+`bot:{uuid}` for the bot. **That is observable structure, not contract**: the SDK
+does not parse ids to infer anything, the same way the server has an explicit
+rule against parsing ids to authorise. An id is an opaque label.
+
+**`flexID` is not ported.** pepibot's type, which remembers whether an id arrived
+as a string or a number, solves a problem that only exists when one binary talks
+to both Chasky and Telegram. In a Chasky-native SDK that problem does not exist,
+and copying it would drag a solution in without its problem: it adds a custom
+type where `string` suffices, and asks the author to think about an ambiguity
+their platform does not have.
+
+**`update_id` is the one numeric exception**, and it deserves its paragraph. It
+is an `int64` server-side (`INCR botapi:seq:{botID}`, one per bot, starting at
+zero). In JS integers are exact up to 2^53; a real `int64` does not fit. In
+practice a per-bot counter comes nowhere near that ceiling, so it is represented
+as a `number`. **This is written down so nobody "fixes" it to `BigInt` without
+knowing why, and so that if the server ever changes the sequence generator — to a
+snowflake, to a timestamp — this decision is reopened.** Gaps in the sequence are
+valid and expected; the SDK must not treat them as loss.
+
+---
+
+## 10. Errors and redaction
+
+### 10.1 Types
 
 ```ts
 class ChaskyApiError extends Error {
-  readonly code: number;         // 400, 401, 403, 404, 500 — control de flujo
-  readonly description: string;  // string del servidor — SOLO para logs
+  readonly code: number;         // 400, 401, 403, 404, 409, 500 — flow control
+  readonly description: string;  // server string — logs ONLY
   readonly method: string;       // "sendMessage", ...
 }
 class ChaskyTransportError extends Error { readonly cause: unknown }
 ```
 
-El control de flujo se hace **por `code`**, nunca por `description`: el servidor
-declara la description como legible y estable, pero no como enumerada.
+Flow control goes **through `code`**, never through `description`: the server
+declares the description readable and stable, but not enumerated.
 
-### 10.2 Clasificación
+### 10.2 Classification
 
-| Clase | Códigos | Qué hace el SDK |
+| Class | Codes | What the SDK does |
 |---|---|---|
-| Terminal | `401`, `403 BOT_SUSPENDED` | Detiene el bot, dispara `onFatal`. No reintenta. |
-| Terminal — desplazado | `409 CONFLICT_POLLING` | Detiene el bot. **Nunca reintenta**: reintentar es una guerra de expulsiones (§3.1). El mensaje dice "otra instancia tomó el poll", no "error de configuración". |
-| De negocio | `400`, `403 CHAT_FORBIDDEN`, `404` | Devuelve el error al llamador. No reintenta: reintentar un `text` vacío da un `text` vacío. |
-| Transitorio | `500`, `5xx`, red, timeout | Backoff exponencial con jitter, **reusando la misma `Idempotency-Key`**. |
+| Terminal | `401`, `403 BOT_SUSPENDED` | Stops the bot, fires `onFatal`. No retry. |
+| Terminal — evicted | `409 CONFLICT_POLLING` | Stops the bot. **Never retries**: retrying is an eviction war (§3.1). The message says "another instance took over polling", not "configuration error". |
+| Business | `400`, `403 CHAT_FORBIDDEN`, `404` | Returns the error to the caller. No retry: retrying an empty `text` yields an empty `text`. |
+| Transient | `500`, `5xx`, network, timeout | Exponential backoff with jitter, **reusing the same `Idempotency-Key`**. |
 
-### 10.3 Redacción — obligatoria, no opcional
+### 10.3 Redaction — mandatory, not optional
 
-**Ningún objeto que el SDK exponga puede contener el token.** La regla no es
-"tener cuidado al loguear": es que el token viaja en la ruta y el transporte
-incrusta la URL en sus propios errores, así que el `Error` ya nace contaminado
-antes de que nadie lo toque.
+**No object the SDK exposes may contain the token.** The rule is not "be careful
+when logging": the token travels in the path and the transport embeds the URL in
+its own errors, so the `Error` is born contaminated before anyone touches it.
 
-Implementación de la regla:
+Implementing the rule:
 
-1. Todo error que cruce el borde del SDK pasa por un redactor que reemplaza el
-   token por `<REDACTED>` en `message`, `stack`, y recursivamente en `cause`.
-2. Se redacta el **token**, y también el patrón `/bot<algo>/` de la ruta, para
-   cubrir el caso de un token distinto del configurado.
-3. El SDK **no loguea por su cuenta**. Emite eventos; loguear es del autor. Pero
-   todo lo que emite ya viene redactado, de modo que la decisión del autor no
-   pueda filtrar la credencial.
-4. El token nunca aparece en la representación del cliente: `toString`,
-   `inspect`, serialización.
+1. Every error crossing the SDK boundary passes through a redactor that replaces
+   the token with `<REDACTED>` in `message`, `stack`, and recursively in `cause`.
+2. Both the **token** and the path pattern `/bot<anything>/` are redacted, to
+   cover a token other than the configured one.
+3. The SDK **does not log on its own**. It emits events; logging is the author's
+   call. But everything it emits is already redacted, so the author's decision
+   cannot leak the credential.
+4. The token never appears in the client's representation: `toString`, `inspect`,
+   serialisation.
 
-**Y una regla más, que pepibot no cubre:** si el `baseUrl` es `http://` y el host
-no es local, el SDK **advierte** —o se niega, según D8— porque un token en la
-ruta sobre texto plano queda escrito en cada proxy del camino. En HTTPS el path
-va cifrado; en HTTP, no.
+**And one more rule pepibot does not cover:** if `baseUrl` is `http://` and the
+host is not loopback, the SDK **warns once at construction** (D8) — a token in
+the path over plaintext is written into every proxy along the way. Over HTTPS the
+path is encrypted; over HTTP it is not. "Loopback" means `localhost`,
+`127.0.0.0/8`, `::1` and `*.localhost`, and deliberately not `*.local`. Silence
+it explicitly with `allowInsecureTransport: true`.
 
 ---
 
-## 11. Webhook: el lugar reservado, sin comprometer la forma
+## 11. Webhook: the reserved seam, with no commitment to shape
 
-Hoy Chasky **no tiene** egreso de webhooks. Está especificado y sin construir en
-`docs/sdd/botapi/botsmith/12-webhook-delivery.md` del servidor. El SDK deja el
-lugar y no promete nada más.
+Chasky has **no** outbound webhook delivery today. It is specified and unbuilt in
+the server's `docs/sdd/botapi/botsmith/12-webhook-delivery.md`. The SDK leaves the
+seam and promises nothing more.
 
-**Lo que sí se compromete:** el transporte es un parámetro, y los handlers del
-autor no cambian al cambiarlo.
+**What is committed:** the transport is a parameter, and the author's handlers do
+not change when it changes.
 
 ```ts
-createBot({ token, transport: polling({ ... }) })    // hoy
-createBot({ token, transport: webhook({ ... }) })    // cuando exista
+createBot({ token, transport: polling({ ... }) })    // today
+createBot({ token, transport: webhook({ ... }) })    // once it exists
 ```
 
-Toda la promesa es esa: `bot.on("text", ...)` sobrevive al cambio.
+That is the whole promise: `bot.on("text", ...)` survives the switch.
 
-**Lo que NO se compromete:** la forma del handler HTTP, el nombre de la cabecera
-de secreto, el modelo de reintentos del servidor, el formato del cuerpo. Todo eso
-está sin construir y comprometerlo hoy sería inventar el contrato del servidor
-desde el cliente.
+**What is NOT committed:** the shape of the HTTP handler, the name of the secret
+header, the server's retry model, the body format. All of it is unbuilt, and
+committing to it today would be inventing the server's contract from the client.
 
-**Dos cosas que el SDK sí debe saber desde ya**, porque están decididas del lado
-del servidor:
+**Three things the SDK does know already**, because they are decided server-side:
 
-- **Polling y webhook son excluyentes.** No es estilo copiado de Telegram: los
-  dos consumirían del mismo consumer group y competirían, con el mismo síntoma
-  invisible del §3.1. Configurar los dos transportes tiene que ser un error de
-  construcción del SDK, no algo que se descubra en producción.
-- **La URL se registra por BotSmith, no por el token.** No va a haber
-  `setWebhook` en la superficie del token, y es a propósito: un token filtrado
-  hoy deja mandar mensajes como el bot —malo, acotado, se cierra rotando—; si
-  además dejara registrar webhook, el atacante redirige **todo el tráfico
-  entrante** a su servidor y lee las conversaciones sin que el dueño lo note.
-  Cuando exista, la configuración de webhook vive en el subpath de **gestión**,
-  no en el entrypoint del runtime.
-- Cuando un bot está en modo webhook, `getUpdates` responde **error explícito**,
-  no lista vacía. El SDK tiene que traducir ese error a un mensaje que diga
-  "estás preguntando por el canal equivocado", porque una lista vacía se lee como
-  "no hay mensajes" y es la peor confusión posible.
+- **Polling and webhook are mutually exclusive.** This is not copied Telegram
+  style: both would consume from the same consumer group and compete, with the
+  same invisible symptom as §3.1. Configuring both transports must be an SDK
+  construction error, not something discovered in production.
+- **The URL is registered through BotSmith, not through the token.** There will
+  be no `setWebhook` on the token surface, deliberately: a leaked token today
+  lets someone send messages as the bot — bad, bounded, closed by rotating; if it
+  also allowed registering a webhook, the attacker would redirect **all inbound
+  traffic** to their own server and read conversations without the owner
+  noticing. When it exists, webhook configuration lives in the **management**
+  subpath, not in the runtime entrypoint.
+- When a bot is in webhook mode, `getUpdates` answers with an **explicit error**,
+  not an empty list. The SDK must translate that error into a message saying "you
+  are asking on the wrong channel", because an empty list reads as "no messages"
+  and is the worst possible confusion.
 
 ---
 
-## 12. Decisiones
+## 12. Decisions
 
-Las cerradas están cerradas: se aplican, no se rediscuten salvo que aparezca
-evidencia nueva. Las abiertas necesitan una respuesta antes de la primera línea
-de código.
+All thirteen are closed. They are applied, not re-litigated, unless new evidence
+shows up — and when it does, the record says what the old reasoning was so the
+change is deliberate.
 
-### Cerradas
-
-| # | Decisión | Resolución | Fundamento |
+| # | Decision | Resolution | Rationale |
 |---|---|---|---|
-| **D1** | Lenguajes y orden | **TS → Go → Python**, los tres | El segundo puerto es el que valida la conformidad; Go es el segundo más barato. §5 |
-| **D2** | ¿Compatible con Telegram o nativo? | **Nativo**, con el modelo mental de Telegram | Los ids son string vs número; toda coerción es error silencioso. §4 |
-| **D3** | Superficie | **Dos superficies separadas**; runtime primero, gestión después | Envelopes incompatibles y un `409` que significa lo opuesto en cada una. El *cómo* se empaquetan lo fija **D13**; la separación se sostiene con los requisitos R-A a R-D del §6 |
-| **D4** | Webhook | **Seam de transporte, sin comprometer forma** | El servidor no lo construyó todavía. §11 |
-| **D5** | Destino de pepibot | **Cliente de conformidad** en `reference/pepibot/`, no semilla de `sdk/go` | Es el único cliente que corre contra las dos plataformas, y el SDK nativo pierde esa capacidad. El movimiento efectivo es tarea de la entrega 2 (abajo) |
-| **D6** | Dedup por `update_id` | **Umbral `> lastSeen`**: un entero, sin estructura de datos | Verificado en el código (abajo). Es más barato **y** más correcto que una ventana finita |
-| **D7** | Persistencia del offset | Gancho `OffsetStore` **opcional**, default en memoria | Un default con disco sorprende; uno con memoria reprocesa **y se ve**. Y el estado es **un solo entero** (abajo) |
-| **D8** | `http://` no local | **Advertir una vez**, no negarse; opción explícita para silenciar | Negarse rompe staging interno legítimo — TLS terminado en el ingress, túneles, compose |
-| **D9** | Layout y nombres | **Monorepo `botsmith-sdk`** —BotSmith nombra al **producto de bots completo**, no solo al gestor—, un directorio por lenguaje en la raíz; scope npm **`@chasky/`** confirmado disponible | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
-| **D10** | Formato de la conformidad | **Casos JSON** + un fake HTTP por lenguaje | Idiomático y sin proceso externo. Decisión **reversible** (abajo) |
-| **D11** | Versionado | **Independiente por lenguaje** + versión del contrato declarada aparte | Un artefacto por lenguaje (D13), así que el semver es por lenguaje: un fix de empaquetado en Python no fuerza releases vacíos en TS y Go. La pregunta que importa —¿garantizan lo mismo?— la contesta la versión del contrato |
-| **D13** | Empaquetado de las dos superficies | **Un artefacto por lenguaje, dos entrypoints**: `@chasky/botsmith` y `@chasky/botsmith/management` | El paquete se llama como el producto (D9) y los tres ecosistemas quedan simétricos. Reemplaza a D3 en el *cómo*; los requisitos R-A a R-D del §6 conservan la separación real por dentro |
+| **D1** | Languages and order | **TS → Go → Python**, all three | The second port is what validates conformance; Go is the cheapest second. §5 |
+| **D2** | Telegram-compatible or native? | **Native**, with Telegram's mental model | Ids are string vs number; every coercion is a silent error. §4 |
+| **D3** | Surface | **Two separate surfaces**; runtime first, management later | Incompatible envelopes and a `409` that means the opposite on each. *How* they are packaged is fixed by **D13**; separation is held by requirements R-A to R-D in §6 |
+| **D4** | Webhook | **Transport seam, no commitment to shape** | The server has not built it yet. §11 |
+| **D5** | pepibot's fate | **Conformance client** in `reference/pepibot/`, not the seed of `go/` | It is the only client running against both platforms, and a native SDK loses that. The actual move is a delivery-2 task |
+| **D6** | Deduplication by `update_id` | **Threshold `> lastSeen`**: one integer, no data structure | Verified against the code (below). Cheaper **and** more correct than a finite window |
+| **D7** | Offset persistence | **Optional** `OffsetStore` hook, in-memory default | A disk default surprises; an in-memory one reprocesses **visibly**. And the state is **a single integer** (below) |
+| **D8** | Non-loopback `http://` | **Warn once**, do not refuse; explicit opt-out | Refusing breaks legitimate internal staging — TLS terminated at the ingress, tunnels, compose |
+| **D9** | Layout and names | **Monorepo `botsmith-sdk`** —BotSmith names the **whole bot product**, not just the manager— one directory per language at the root; npm scope **`@chasky/`** confirmed available | Three ports of one contract, same team, same time. Detail in `01-organization.md` |
+| **D10** | Conformance format | **JSON cases** + one HTTP fake per language | Idiomatic and process-free. **Reversible** (below) |
+| **D11** | Versioning | **Independent per language** + contract version declared separately | One artifact per language (D13), so semver is per language: a packaging fix in Python does not force empty releases in TS and Go. The question that matters —do they guarantee the same?— is answered by the contract version |
+| **D12** | Translate `docs/` to English | **Done on 2026-09-09.** Included renaming `01-organizacion.md` → `01-organization.md`, updating links, and dropping the *"(in Spanish for now)"* notices | It was tracked as a numbered decision rather than a loose TODO precisely so it would be counted among what was pending instead of evaporating |
+| **D13** | Packaging of the two surfaces | **One artifact per language, two entrypoints**: `@chasky/botsmith` and `@chasky/botsmith/management` | The artifact is named after the product (D9) and the three ecosystems come out symmetric. Supersedes D3 on the *how*; requirements R-A to R-D in §6 keep the real separation inside |
 
-#### Verificación de D6 (2026-09-08)
+### D6 verification (2026-09-08)
 
-Leído en `internal/core/botapi/infrastructure/redis/`, rama `cc-jose-nieto/botapi`:
+Read in `internal/core/botapi/infrastructure/redis/`, branch
+`cc-jose-nieto/botapi`:
 
-1. **`producer.go`** — el `XADD` del script Lua usa un **stream ID explícito**
-   igual a `<update_id>-0`, así que **el orden del stream es el orden de
-   `update_id`**. El script además compara contra el último ID del stream y
-   aborta antes que emitir uno regresivo: hay **gaps válidos, nunca IDs hacia
-   atrás**.
-2. **`updates.go`** — el lector recorre primero el **PEL** (`XREADGROUP` desde
-   `"0"`, con el cursor avanzando por `entry.ID`) y recién después las **nuevas**
-   (`">"`), que por construcción tienen IDs mayores que cualquier pendiente.
+1. **`producer.go`** — the Lua script's `XADD` uses an **explicit stream ID**
+   equal to `<update_id>-0`, so **stream order is `update_id` order**. The script
+   also compares against the stream's last ID and aborts rather than emit a
+   regressive one: there are **valid gaps, never backwards ids**.
+2. **`updates.go`** — the reader walks the **PEL** first (`XREADGROUP` from
+   `"0"`, cursor advancing by `entry.ID`) and only then the **new** entries
+   (`">"`), which by construction have ids greater than any pending one.
 
-De ahí sale que **cada respuesta llega en orden ascendente estricto**, y que entre
-respuestas también lo está mientras el offset avance (G2). La única fuente de
-repetición es una re-entrega del PEL, y siempre trae `update_id <= lastSeen`.
+From that: **every response arrives in strictly ascending order**, and so does
+the sequence across responses as long as the offset advances (G2). The only
+source of repetition is a PEL redelivery, and it always carries
+`update_id <= lastSeen`.
 
-**El umbral no filtra de más**: sin identificadores regresivos, un `update_id` por
-debajo del umbral es siempre un duplicado.
+**The threshold does not over-filter**: with no regressive identifiers, an
+`update_id` below the threshold is always a duplicate.
 
-**Y es más correcto que una ventana finita.** Si el consumer group se recrea
-—camino `NOGROUP` del propio lector— el last-delivered-id vuelve a cero y se
-re-entrega **el stream entero**. Una ventana de N=1000 reprocesa todo lo anterior
-a esas mil entradas; el umbral no se inmuta. Se elige por correctitud; que además
-sea un entero en vez de una estructura es el bonus.
+**And it is more correct than a finite window.** If the consumer group is
+recreated — the reader's own `NOGROUP` path — the last-delivered-id resets to
+zero and **the entire stream** is redelivered. A window of N=1000 reprocesses
+everything older than those thousand entries; the threshold does not flinch. It
+is chosen for correctness; being one integer instead of a structure is the bonus.
 
-*Alcance*: el umbral vale **dentro de la vida del proceso**. Al reiniciar,
-`lastSeen` arranca en cero y el PEL se reprocesa — eso es **D7**, no D6, y es el
-default documentado en L2.
+*Scope*: the threshold holds **within the process's lifetime**. On restart
+`lastSeen` starts at zero and the PEL is reprocessed — that is **D7**, not D6,
+and it is the default documented in L2.
 
-#### D7 — y el hallazgo de que el estado es un solo entero
+### D7 — and the finding that the state is a single integer
 
-`OffsetStore` es una interfaz de dos métodos, `load()` y `save(n)`, invocada
-**una vez por lote** y no por update: guardar por update sería correcto y lento.
+`OffsetStore` is a two-method interface, `load()` and `save(n)`, invoked **once
+per batch** and not per update: saving per update would be correct and slow.
 
-Y hay una simplificación que cae de D6 y que conviene tener escrita antes de
-implementar tres veces: **el offset y el umbral de dedup son el mismo número.**
+And there is a simplification falling out of D6 that is worth writing down before
+implementing it three times: **the offset and the dedup threshold are the same
+number.**
 
-Con G2 el offset es `max(update_id del lote) + 1`, y con G3 el umbral es
-`max(update_id procesado)`. Como el offset avanza pase lo que pase con los
-handlers, al cerrar cada lote vale siempre `offset == lastSeen + 1`. **No son dos
-piezas de estado: es una.** El `OffsetStore` persiste un entero, y de ahí salen
-las dos cosas.
+Under G2 the offset is `max(update_id in batch) + 1`, and under G3 the threshold
+is `max(update_id processed)`. Since the offset advances regardless of what
+happens to the handlers, `offset == lastSeen + 1` holds at the close of every
+batch. **They are not two pieces of state: they are one.** The `OffsetStore`
+persists one integer, and both fall out of it.
 
-Default en memoria porque un default con disco sorprende —¿dónde escribe, con qué
-permisos, qué pasa en un contenedor efímero?— y porque reprocesar al reiniciar no
-viola nada: at-least-once ya está delegado en L1. Es visible, es documentado, y
-quien no lo quiera implementa la interfaz.
+The default is in-memory because a disk default surprises — where does it write,
+with what permissions, what happens in an ephemeral container? — and because
+reprocessing on restart violates nothing: at-least-once is already delegated in
+L1. It is visible, it is documented, and whoever does not want it implements the
+interface.
 
-#### D8 — advertir, con precisión
+### D10 — JSON cases, and why not the single binary
 
-La advertencia se emite **una sola vez, al construir el cliente**, no por request:
-una advertencia por poll es ruido que se termina filtrando en un grep.
+The alternative was a conformance binary hosting the fake, with all three SDKs
+hitting it over real HTTP. It is **more faithful** — real HTTP, not a mock — and
+it is paid for dearly: it has to be built and maintained, every CI has to start
+it, wait for the port and kill it, and a whole family of new failures appears
+that are not the SDK's (occupied ports, startup races).
 
-"Local" es **solo loopback**: `localhost`, `127.0.0.0/8`, `::1`, `*.localhost`.
-Deliberadamente NO incluye `*.local`, que en mDNS puede ser una máquina de la red
-real y ahí el token viaja en claro por la ruta.
+JSON cases with a per-language fake use the HTTP mock each ecosystem already has,
+with no external process. **JSON and not YAML** because all three languages parse
+it without adding a dependency.
 
-Se silencia con una opción explícita (`allowInsecureTransport: true`). Quien la
-escribe, sabe lo que está aceptando; el default no lo decide por él.
+The real risk is three fakes interpreting a case differently. It is bounded by
+having the case declare **the expected requests exactly** — method, path,
+headers, body — and having the fake merely replay them: what is verified is the
+observed against the declared, never logic living inside the fake.
 
-#### D10 — casos JSON, y por qué no el binario único
+It is a **reversible** decision, and that is half the argument: if the three
+fakes start diverging, migrate to the single binary with the same cases.
 
-La alternativa era un binario de conformidad que hospeda el fake y contra el que
-los tres SDKs pegan por HTTP real. Es **más fiel** —HTTP de verdad, no un mock— y
-se paga caro: hay que construirlo y mantenerlo, cada CI tiene que arrancarlo,
-esperar el puerto y matarlo, y aparece una familia entera de fallas nuevas que no
-son del SDK (puertos ocupados, carreras de arranque).
+### D11 — package version and contract version
 
-Los casos JSON con un fake por lenguaje usan el mock HTTP que cada ecosistema ya
-tiene, sin proceso externo. **JSON y no YAML** porque los tres lenguajes lo
-parsean sin agregar dependencia.
+Each language publishes one artifact (D13) with its own semver: a packaging fix
+in Python does not force empty releases in TypeScript and Go.
 
-El riesgo real es que tres fakes interpreten un caso distinto. Se acota haciendo
-que el caso declare **las requests esperadas de forma exacta** —método, ruta,
-cabeceras, cuerpo— y que el fake solo las reproduzca: lo que se verifica es lo
-observado contra lo declarado, nunca lógica que viva dentro del fake.
+Separately, each artifact declares **which contract version** it satisfies, and
+conformance cases declare which version they belong to. That answers the one
+question that actually matters across three implementations: *do these two SDKs
+guarantee the same thing?* — which the package version does not.
 
-Es una decisión **reversible**, y ese es medio argumento: si los tres fakes
-empiezan a divergir, se migra al binario único con los mismos casos.
-
-#### D11 — versión de paquete y versión de contrato
-
-Cada lenguaje publica un artefacto (D13) con su propio semver: un fix de
-empaquetado en Python no fuerza releases vacíos en TypeScript y Go.
-
-Aparte, cada artefacto declara **contra qué versión del contrato** cumple, y los
-casos de conformidad declaran a qué versión pertenecen. Eso responde la única
-pregunta que de verdad importa entre tres implementaciones: *¿estos dos SDKs
-garantizan lo mismo?* — que la versión del paquete no contesta.
-
-La versión del contrato es `MAJOR.MINOR`: **MINOR** cuando se agrega una garantía,
-**MAJOR** cuando cambia una que ya existía.
-
-### Abiertas
-
-| # | Decisión | Recomendación | Qué falta |
-|---|---|---|---|
-| **D12** | Traducir `docs/` al inglés | **DISPARADA el 2026-09-08**: D5, D7, D8, D10 y D11 cerraron, así que esto es lo único pendiente. Incluye renombrar `01-organizacion.md` → `01-organization.md`, actualizar los enlaces y quitar los avisos *"(in Spanish for now)"* de los READMEs | Ya no espera nada. Queda en esta lista hasta ejecutarse, que es exactamente para lo que estaba: un paso pendiente que no se cuenta es un paso que se olvida |
+The contract version is `MAJOR.MINOR`: **MINOR** when a guarantee is added,
+**MAJOR** when an existing one changes.
 
 ---
 
-## 13. Lo que le pedimos al servidor
+## 13. What we ask of the server
 
-Salen de este análisis y son tickets de `backend-api-go`, no del SDK.
+These come out of this analysis and are `backend-api-go` tickets, not SDK work.
 
-- **S1 — `409` en `getUpdates` concurrente, como Telegram. ✅ RESUELTO
-  (2026-09-08, commit `d4526381`).** Era el hallazgo #1: dos consumidores se
-  repartían los updates sin error visible, y ninguna disciplina del cliente lo
-  detectaba desde afuera. Hoy hay un cerrojo por bot y un `409 CONFLICT_POLLING`
-  (§3.1). El peor modo de falla del sistema —silencioso, intermitente, imposible
-  de diagnosticar— pasó a ser un mensaje de error.
+- **S1 — `409` on concurrent `getUpdates`, like Telegram. ✅ RESOLVED
+  (2026-09-08, commit `d4526381`).** This was finding #1: two consumers split the
+  updates with no visible error, and no amount of client discipline could detect
+  it from outside. Today there is a per-bot lock and a `409 CONFLICT_POLLING`
+  (§3.1). The system's worst failure mode — silent, intermittent, impossible to
+  diagnose — became an error message.
 
-  **Salvedad para el repo del servidor, no para el SDK:** el `Req.X1` de
-  `14-poll-exclusion.md` dice que falla *el que llega*; la implementación hace lo
-  contrario y **desplaza al que estaba**, con el motivo explicado en el commit.
-  El código manda y el SDK se escribe contra el código; ese spec quedó
-  desactualizado.
-- **S2 — Normalizar `getMe`.** Devuelve `first_name` (nombre de Telegram) cuando
-  el resto del contrato usa `name` (nombre de Chasky). Habiendo elegido no ser
-  compatible con Telegram, esa asimetría no compra nada y confunde. Agregar
-  `display_name` conservando `first_name` por compatibilidad sería suficiente.
-- **S3 — Publicar los límites efectivos.** `BOTAPI_UPDATES_MAX_LIMIT` y
-  `BOTAPI_UPDATES_MAX_TIMEOUT` son configurables, y hoy el cliente los tiene que
-  hardcodear para poder clampear (G6). Exponerlos en `getMe` —o en un
-  `getLimits`— hace que el SDK se adapte a la instancia en vez de adivinarla.
-- **S4 — Documentar la retención por bot.** El `XTRIM` aproximado puede llevarse
-  updates no confirmados. Un autor necesita saber cuánto tiempo puede estar caído
-  su bot antes de perder mensajes; hoy ese número no está publicado.
-- **S5 — `Retry-After` en el `429` de BotSmith.** Menor. Sin esa cabecera, un
-  cliente de `TOO_MANY_ATTEMPTS` solo puede adivinar el backoff.
+  **A caveat for the server repo, not for the SDK:** `Req.X1` in
+  `14-poll-exclusion.md` says the *arriving* poll fails; the implementation does
+  the opposite and **evicts the incumbent**, for the reason given in the commit.
+  The code wins and the SDK is written against the code; that spec is stale.
+- **S2 — Normalise `getMe`.** It returns `first_name` (a Telegram name) where the
+  rest of the contract uses `name` (a Chasky name). Having chosen not to be
+  Telegram-compatible, that asymmetry buys nothing and confuses. Adding
+  `display_name` while keeping `first_name` for compatibility would be enough.
+- **S3 — Publish the effective limits.** `BOTAPI_UPDATES_MAX_LIMIT` and
+  `BOTAPI_UPDATES_MAX_TIMEOUT` are configurable, and today the client has to
+  hardcode them in order to clamp (G6). Exposing them in `getMe` — or in a
+  `getLimits` — lets the SDK adapt to the instance instead of guessing it.
+- **S4 — Document per-bot retention.** Approximate `XTRIM` can take
+  unacknowledged updates. An author needs to know how long their bot can be down
+  before losing messages; that number is not published today.
+- **S5 — `Retry-After` on BotSmith's `429`.** Minor. Without the header, a
+  `TOO_MANY_ATTEMPTS` client can only guess the backoff.
 
 ---
 
-## 14. Lo que NO entra en la primera entrega
+## 14. Out of scope for the first delivery
 
-Adjuntos y media (el servidor solo hace texto en v1). Botones y callbacks. Teclado
-inline. Presencia. Edición y borrado de mensajes. Grupos (el modelo es un bot
-atendiendo a muchos usuarios, cada uno con su chat privado). Registro de bots
-desde el SDK (`POST /bot/register` usa platform key server-to-server y no debe
-salir de la plataforma). Webhook. Reintento automático a nivel de handler.
+Attachments and media (the server only does text in v1). Buttons and callbacks.
+Inline keyboards. Presence. Message editing and deletion. Groups (the model is one
+bot serving many users, each in their own private chat). Bot registration from the
+SDK (`POST /bot/register` uses a server-to-server platform key and must not leave
+the platform). Webhook. Automatic retry at the handler level.
 
-Nada de esto está descartado; está **fuera del alcance de la primera entrega**, y
-la razón en casi todos los casos es la misma: el servidor todavía no lo ofrece.
+None of it is ruled out; it is **out of scope for the first delivery**, and in
+almost every case for the same reason: the server does not offer it yet.

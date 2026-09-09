@@ -14,7 +14,7 @@ and the runtime never imports from the management subpath. See requirements R-A
 through R-D in §6 of the contract. Whatever little they do share lives in `core/`,
 which is **internal and never published**.
 
-- Contract: [`../docs/00-spec.md`](../docs/00-spec.md) *(in Spanish for now)*
+- Contract: [`../docs/00-spec.md`](../docs/00-spec.md)
 - What must be identical across the three SDKs and what must not:
-  [`../docs/01-organizacion.md`](../docs/01-organizacion.md) §3
+  [`../docs/01-organization.md`](../docs/01-organization.md) §3
 - No code until D5, D7, D8, D10 and D11 in §12 of the contract are closed.

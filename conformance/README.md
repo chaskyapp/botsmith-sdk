@@ -20,4 +20,4 @@ Cases born from a single implementation describe that implementation. That shake
 is exactly why Go ships second.
 
 Details and the priority case list:
-[`../docs/01-organizacion.md`](../docs/01-organizacion.md) §4 *(in Spanish for now)*.
+[`../docs/01-organization.md`](../docs/01-organization.md) §4.

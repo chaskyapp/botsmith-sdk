@@ -17,4 +17,4 @@
 - It is written **looking at** `reference/pepibot/`, not derived from it: pepibot
   runs against Chasky and Telegram at once, and that is its whole value. See §5.4
   of the contract.
-- Contract: [`../docs/00-spec.md`](../docs/00-spec.md) *(in Spanish for now)*
+- Contract: [`../docs/00-spec.md`](../docs/00-spec.md)

@@ -26,15 +26,11 @@ second port because the team already writes it and `pepibot` already exists.
 - **[docs/00-spec.md](docs/00-spec.md)** — the contract: purpose, surface,
   guaranteed and delegated semantics, identifiers, errors and redaction,
   decisions, and requests to the server.
-- **[docs/01-organizacion.md](docs/01-organizacion.md)** — how that contract
+- **[docs/01-organization.md](docs/01-organization.md)** — how that contract
   survives three implementations without drifting: layout, what is invariant and
   what is idiomatic, conformance suite, versioning, work order.
 - **[conformance/](conformance/)** — the suite that turns the guarantees into
   failing tests. It gets written **before** any SDK.
-
-> **Note:** `docs/` is currently written in Spanish. Everything published —code,
-> comments, error messages, these READMEs— is English. The specs get translated
-> once the open decisions close (D12).
 
 ## The three things that matter most
 
