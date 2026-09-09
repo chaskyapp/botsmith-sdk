@@ -253,10 +253,10 @@ languages.
 
 ### Delivery 2 — Go
 
-6. Move `~/Desktop/pepibot/` into `reference/pepibot/` and **translate its
-   comments to English** (D5). Deliberately not done earlier: the file is in
-   active use, and copying it then would have created two versions diverging from
-   day one.
+6. ~~Move `~/Desktop/pepibot/` into `reference/pepibot/` and translate its
+   comments to English (D5).~~ **Done.** Copied rather than moved: the original on
+   the Desktop is the author's to delete. From here the repo copy is the one that
+   is maintained.
 7. ~~`botsmith-sdk/go`~~ **Done.**
 8. ~~Go conformance runner, against the same cases.~~ **Done**: 11/11, first run,
    with no case edited. `TestRunnerDetectsAMismatch` proves that runner checks.
