@@ -5,6 +5,7 @@ Nothing has to be installed to check the SDK. pytest picks these up too.
 
 from __future__ import annotations
 
+import asyncio
 import unittest
 from pathlib import Path
 
@@ -15,6 +16,13 @@ CASES_DIR = Path(__file__).resolve().parents[2] / "conformance" / "cases"
 
 
 class ConformanceTest(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        # IsolatedAsyncioTestCase runs the loop in debug mode, which reports any
+        # await over 100ms as a slow callback. Every case here is a long poll
+        # deliberately waiting, so that warning fires constantly and says
+        # nothing. Turning it off keeps a green run readable.
+        asyncio.get_running_loop().set_debug(False)
+
     async def test_conformance(self) -> None:
         cases = load_cases(CASES_DIR)
         self.assertTrue(cases, f"no cases found in {CASES_DIR}")

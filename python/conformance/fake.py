@@ -109,7 +109,24 @@ class FakeServer:
                 self.end_headers()
                 self.wfile.write(encoded)
 
-        self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        class QuietServer(ThreadingHTTPServer):
+            def handle_error(self, request: object, client_address: object) -> None:
+                """Swallow the resets this fake causes on purpose.
+
+                g5-transport-error-does-not-leak-the-token works by killing the
+                connection, and socketserver answers that with a full traceback
+                on stderr. A passing run should be quiet: noise around a green
+                result is where a real failure goes to hide.
+                """
+                import sys
+                import traceback
+
+                exc = sys.exc_info()[1]
+                if isinstance(exc, (ConnectionResetError, BrokenPipeError)):
+                    return
+                traceback.print_exc()
+
+        self._server = QuietServer(("127.0.0.1", 0), Handler)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
 
