@@ -57,9 +57,16 @@ Worth knowing before reading the contract: deduplication and the poll offset are
 **the same single integer** (`offset == lastSeen + 1`), verified against the
 server code. The SDK keeps one number, not a data structure.
 
-The runtime package is `@chasky/bot` on npm (the `@chasky/` scope is confirmed
-available), and the same standard —the `chasky` identity plus the role in one
-word— carries over to Go and PyPI.
+Each language ships **one artifact with two entrypoints** — the bot runtime at the
+root, management under `/management`:
 
-The **management** package still needs a name: since `botsmith` now refers to the
-whole product, it can no longer name one of its two halves. See D13.
+| | Runtime | Management |
+|---|---|---|
+| npm | `@chasky/botsmith` | `@chasky/botsmith/management` |
+| Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/management` |
+| PyPI | `chasky_botsmith` | `chasky_botsmith.management` |
+
+Sharing an artifact does not make them one thing: they authenticate differently,
+use incompatible envelopes, and a `409` means the opposite on each. Requirements
+R-A through R-D in §6 of the contract are what keep them apart — separate
+constructors, separate error types, and no import from runtime into management.
