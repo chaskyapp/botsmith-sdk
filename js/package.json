@@ -1,0 +1,21 @@
+{
+  "name": "@chasky/botsmith",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Client SDK for the Chasky Bot API",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "exports": {
+    ".": "./dist/index.js",
+    "./management": "./dist/management/index.js"
+  },
+  "scripts": {
+    "conformance": "tsx conformance/run.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
