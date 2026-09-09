@@ -272,8 +272,18 @@ languages.
 
 ### Delivery 3 — Python
 
-10. `chasky_botsmith`, with the contract already shaken out by two ports.
-11. Runner and conformance.
+10. ~~`chasky_botsmith`, with the contract already shaken out by two ports.~~
+    **Done.**
+11. ~~Runner and conformance.~~ **Done**: 11/11, no case edited. The runner is
+    `unittest` — stdlib, so checking the SDK installs nothing beyond `httpx`.
+
+    Third port, same result as the second: nothing ambiguous surfaced. The same
+    caveat applies as in step 9 — one author, one reading of the contract — but
+    three ports agreeing on eleven cases does establish that the guarantees are
+    expressible without borrowing any one language's shape. The three chose three
+    different ways to report a terminal failure (a callback, a return value, an
+    exception) and the suite did not care, which is the clearest evidence that
+    the cases test behaviour rather than form.
 
 ### Cross-cutting, any time
 

@@ -15,11 +15,16 @@ decisions that belong to each bot author.
 |---|---|---|---|
 | 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — runtime done, 11/11 conformance |
 | 2 | Go | `github.com/chaskyapp/botsmith-sdk/go` | [`go/`](go/) — implemented, 11/11 conformance |
-| 3 | Python | `chasky-botsmith` | [`python/`](python/) — implemented, conformance pending a run |
+| 3 | Python | `chasky-botsmith` | [`python/`](python/) — implemented, 11/11 conformance |
 
-The order is TypeScript → Go → Python. The reason is in §5 of the contract: **a
-conformance suite proves nothing with a single consumer**, and Go is the cheapest
-second port because the team already writes it and `pepibot` already exists.
+All three pass the same eleven cases. The order was TypeScript → Go → Python, for
+the reason in §5 of the contract: **a conformance suite proves nothing with a
+single consumer**, and Go was the cheapest second port because the team already
+writes it and `pepibot` already existed.
+
+Each runner is shaped like its ecosystem — a CLI, `go test`, `unittest` — and each
+one carries a guard proving it can fail, because a runner that has never failed a
+case is not a tested runner.
 
 ## Where to start
 
