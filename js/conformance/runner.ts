@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import type { BotFactory, BotUnderTest } from "./adapter.js";
 import { FakeServer } from "./fake-server.js";
 import { failure, matchHeaders, matchPartial, type Captures } from "./matchers.js";
-import type { ConformanceCase, Failure, Json, ObservedRequest } from "./types.js";
+import type { ConformanceCase, Failure, Json } from "./types.js";
 
 /** Fixed test credential. Never a real token; cases refer to it as {token}. */
 export const TEST_TOKEN = "bot:b1:" + "0".repeat(64);

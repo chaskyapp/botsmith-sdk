@@ -69,7 +69,7 @@ async function loadFactory(specifier: string): Promise<BotFactory> {
         `  ${error instanceof Error ? error.message : String(error)}\n\n` +
         `The SDK must export a BotFactory (see adapter.ts). Until it exists, run the\n` +
         `runner against the bundled fixture:\n\n` +
-        `  npm run conformance -- --factory ./fixtures/naive-bot.js\n`,
+        `  npm run conformance -- --factory ./fixtures/naive-bot.ts\n`,
     );
     process.exit(2);
   }

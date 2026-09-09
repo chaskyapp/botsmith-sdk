@@ -33,8 +33,10 @@ export interface BotUnderTest {
 export interface BotUnderTestOptions {
   baseUrl: string;
   token: string;
-  limit?: number;
-  timeoutSeconds?: number;
+  // Explicitly `| undefined`: tsconfig sets exactOptionalPropertyTypes, so the
+  // runner cannot forward an absent case option into a plain optional field.
+  limit?: number | undefined;
+  timeoutSeconds?: number | undefined;
   handler: HandlerSpec;
 }
 
