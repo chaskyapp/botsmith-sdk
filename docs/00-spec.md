@@ -365,7 +365,7 @@ de Go nace mirándolo, no siendo él (D5, §12).
 
 ## 6. Decisión — superficie mínima y empaquetado
 
-**Recomendación: dos paquetes, y solo el primero en la primera entrega.**
+**CERRADA: dos paquetes por lenguaje, y solo el primero en la primera entrega.**
 
 ### Paquete 1 — runtime del bot (primera entrega)
 
@@ -377,18 +377,84 @@ Credencial: el token, en la ruta. Superficie: `getMe`, `getUpdates`,
 Credencial: **sesión humana + `X-Secret`**. Superficie: los seis endpoints de
 `/bot-management`.
 
-Son dos paquetes y no uno por tres razones, en orden de peso:
+### Por qué son dos y no uno
 
-1. **Credenciales distintas.** Un paquete solo obliga a un constructor que acepta
-   token *o* sesión+secreto, y eso invita al error más caro posible: mandar el
-   `X-Secret` de la plataforma desde el proceso del bot, o el token del bot desde
-   el navegador. Separar los paquetes hace que ese error ni se pueda escribir.
-2. **Audiencias distintas.** El runtime lo instala el autor del bot en su
-   servidor. La gestión la usa quien provisiona bots — hoy, una persona en el
-   portal.
-3. **Formas distintas.** `/bot-management/commands` no es REST: es un diálogo con
-   estado, `operationID`, `expectedRevision` y CAS. Modelarlo bien es un trabajo
-   propio, y no debería demorar la primera entrega del runtime.
+No son dos partes del mismo SDK: **son dos sistemas distintos que casualmente
+hablan del mismo objeto.** El contraste, verificado contra el servidor:
+
+| | Runtime | Gestión |
+|---|---|---|
+| Credencial | token en la **ruta** | sesión humana **+** `X-Secret` |
+| Ruta | `/bot<TOKEN>/sendMessage` | `/bot-management/commands` |
+| Auth del servidor | `IsPublic: true, NoRequiresAuthentication: true` | middleware de sesión + secreto de API |
+| Envelope éxito | `{ok, result}` | `{ok, data}` |
+| Envelope error | `{ok:false, error_code, description}` | `{ok:false, error:{code}}` |
+| Tipo del código de error | **número** (`409`) | **string** (`"STALE_STATE"`) |
+| Forma | REST con métodos | máquina de estados con CAS |
+| Quién lo corre | el proceso del bot, 24/7 | un humano, una vez |
+
+Cuatro razones, en orden de peso:
+
+**1. Los envelopes son incompatibles, y el `409` significa lo contrario en cada
+superficie.** Esta razón no es un juicio de diseño: es un hecho del servidor.
+
+Un envelope tiene `result` y el otro `data`. Uno codifica el error como número y
+el otro como string dentro de un objeto anidado. Un cliente HTTP no puede parsear
+los dos sin ramificar en la primera línea.
+
+Y encima:
+
+| `409` en… | Código | Qué significa | Qué debe hacer el cliente |
+|---|---|---|---|
+| Runtime | `CONFLICT_POLLING` | otra instancia te desplazó | **detenerse**, jamás reintentar |
+| Gestión | `STALE_STATE` | tu `expectedRevision` está viejo | **releer y reintentar** |
+
+**Es el mismo número con la instrucción opuesta.** En un paquete único queda un
+`ChaskyError` con `code: 409` cuyo manejo correcto depende de qué endpoint lo
+produjo — y el día que alguien escriba un `if (code === 409) retry()` compartido,
+rompe el runtime de la peor forma posible: la guerra de expulsiones del §3.1.
+
+**2. Credenciales distintas, y el daño de filtrarlas no es simétrico.** Un
+paquete único obliga a un constructor que acepta token *o* sesión+secreto, y eso
+hace **escribible** el peor error del sistema: mandar el `X-Secret` de plataforma
+desde el proceso del bot, que corre en el servidor de un tercero.
+
+- **Token filtrado**: el atacante manda mensajes como ese bot. Malo, acotado, se
+  cierra rotando el token.
+- **`X-Secret` filtrado**: es un secreto de **plataforma**, no de un bot. No es el
+  mismo incidente.
+
+Es la llave del departamento y la llave maestra del edificio: las dos abren
+puertas, y no van en el mismo llavero. Con dos paquetes ese error **no se puede
+ni tipear** — el paquete del runtime no tiene un campo donde poner el `X-Secret`.
+
+Y no es criterio importado: **es el mismo razonamiento de radio de impacto que el
+servidor ya aplicó** al decidir que `setWebhook` no va en la superficie del token
+(`12-webhook-delivery.md`, Req.W1). Esto lo respeta del lado del cliente.
+
+**3. Audiencias distintas.** El runtime lo instala el autor del bot en su
+servidor. La gestión la usa quien provisiona bots — que puede ser otra persona:
+BotSmith separa explícitamente al dueño (sesión humana) del portador del token.
+
+**4. Formas distintas.** `/bot-management/commands` no es REST: es un diálogo con
+estado, `operationID`, `expectedRevision` y CAS optimista. Modelarlo bien es un
+trabajo propio, y no debería demorar la primera entrega del runtime.
+
+### El contraargumento, y qué se hace con él
+
+Dos paquetes son dos publicaciones, dos versiones y más ceremonia. Y comparten
+código: redacción del token, backoff, cliente HTTP.
+
+Comparten **menos de lo que parece** — el envelope, que es el corazón del parseo,
+es distinto en los dos. Lo que sí se repite son unas 50 líneas. Van a un paquete
+**interno y no publicado** (`js/core/`, `go/internal/`, `python/_core/`), del que
+ninguno de los dos paquetes públicos expone la superficie del otro.
+
+La alternativa —un paquete con dos entrypoints, `@chasky/bot` y
+`@chasky/bot/smith`— ahorra esa ceremonia y **pierde la garantía**: el código de
+gestión ya está instalado en el proceso del bot, así que el `X-Secret` vuelve a
+ser algo que alguien puede pasarle. Es una ceremonia menos a cambio de la razón 2
+entera.
 
 **Por qué BotSmith no es urgente:** casi todos los autores crean el bot **una
 vez**, a mano, en el portal. La automatización por código sirve para un caso
@@ -698,7 +764,7 @@ de código.
 |---|---|---|---|
 | **D1** | Lenguajes y orden | **TS → Go → Python**, los tres | El segundo puerto es el que valida la conformidad; Go es el segundo más barato. §5 |
 | **D2** | ¿Compatible con Telegram o nativo? | **Nativo**, con el modelo mental de Telegram | Los ids son string vs número; toda coerción es error silencioso. §4 |
-| **D3** | Superficie | **Dos paquetes por lenguaje**; runtime primero, gestión después | Credenciales distintas: un paquete único hace *escribible* mandar el `X-Secret` desde el proceso del bot. §6 |
+| **D3** | Superficie | **Dos paquetes por lenguaje**; runtime primero, gestión después | Envelopes incompatibles y un `409` que significa lo opuesto en cada superficie; y un paquete único hace *escribible* mandar el `X-Secret` desde el proceso del bot. §6 |
 | **D4** | Webhook | **Seam de transporte, sin comprometer forma** | El servidor no lo construyó todavía. §11 |
 | **D9** | Layout y nombres | **Monorepo `bot-sdk`**, un directorio por lenguaje en la raíz; scope npm **`@chasky/`** confirmado disponible | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
 

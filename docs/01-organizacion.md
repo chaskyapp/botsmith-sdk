@@ -40,12 +40,22 @@ bot-sdk/
 ├── conformance/
 │   ├── README.md               Cómo se corre y cómo se agrega un caso.
 │   └── cases/                  Casos declarativos. Fuente de verdad ejecutable.
-├── js/                         @chasky/bot        · primera entrega
-├── go/                         .../bot-sdk/go     · segunda entrega
-├── python/                     chasky-bot         · tercera entrega
+├── js/                         @chasky/bot + @chasky/botsmith  · entrega 1
+│   └── core/                   Interno, NO publicado. Ver 00-spec.md §6.
+├── go/                         .../bot-sdk/go  (+ /botsmith)    · entrega 2
+│   └── internal/               Interno, no importable desde afuera.
+├── python/                     chasky-bot + chasky-botsmith     · entrega 3
+│   └── _core/                  Interno por convención.
 └── reference/
     └── pepibot/                Cliente de conformidad (pendiente D5)
 ```
+
+Cada lenguaje publica **dos** paquetes —runtime y gestión— y guarda lo poco que
+comparten en un módulo **interno y no publicado**. El motivo de la separación
+está en el §6 del contrato, y no es prolijidad: los envelopes son incompatibles y
+el `409` significa lo contrario en cada superficie. Ese módulo interno **no puede
+exponer la superficie de un paquete al otro**; si empieza a crecer, es señal de
+que algo que debía quedar separado se está filtrando.
 
 **Un directorio por lenguaje en la raíz, no bajo `sdk/`.** El anidamiento extra
 no compra nada y encarece los tags de Go: `go/v0.1.0` es legible,
