@@ -27,6 +27,18 @@ developer runs. Same cases, same verdicts, different shape.
 makes one expectation impossible, and requires the runner to notice. A runner
 that has never failed a case is not a tested runner.
 
+## Smoke test against a real server
+
+```bash
+cp ../.env.example ../.env    # then fill in the token
+go run ./cmd/smoke
+```
+
+Conformance proves the SDK against a fake that answers what the cases declare.
+This proves the other half: that the cases describe the **real** server. It
+checks `getMe` — the one method no case exercises — and prints the wire shape of
+the first update once, so the assumptions eleven cases rest on meet the server.
+
 ## Shape
 
 The guarantees are identical to the TypeScript SDK; the shape is Go's.

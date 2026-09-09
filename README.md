@@ -37,6 +37,25 @@ case is not a tested runner.
 - **[conformance/](conformance/)** — the suite that turns the guarantees into
   failing tests. It gets written **before** any SDK.
 
+## Smoke tests
+
+Each SDK has one, and they all read a single `.env` in this directory:
+
+```bash
+cp .env.example .env    # then fill in the token, never export it on a command line
+```
+
+| | Command |
+|---|---|
+| TypeScript | `cd js && npm run smoke` |
+| Go | `cd go && go run ./cmd/smoke` |
+| Python | `cd python && .venv/bin/python smoke.py` |
+
+Conformance proves an SDK against a fake that answers what the cases declare.
+The smoke tests prove the other half: that the cases describe the **real**
+server. A case written from a misreading of the spec passes conformance and
+fails here.
+
 ## The three things that matter most
 
 1. **One process per bot, and starting up displaces whoever was there.** Since

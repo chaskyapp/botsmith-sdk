@@ -1,0 +1,3 @@
+# The bot token lives here: never in the repo. Read by all three smoke scripts.
+.env
+.DS_Store
