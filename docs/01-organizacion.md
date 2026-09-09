@@ -40,23 +40,27 @@ botsmith-sdk/
 ├── conformance/
 │   ├── README.md               Cómo se corre y cómo se agrega un caso.
 │   └── cases/                  Casos declarativos. Fuente de verdad ejecutable.
-├── js/                         @chasky/bot + gestión (D13)     · entrega 1
+├── js/                         @chasky/botsmith (+ /management) · entrega 1
 │   └── core/                   Interno, NO publicado. Ver 00-spec.md §6.
-├── go/                         .../botsmith-sdk/go  (+ gestión, D13) · entrega 2
+├── go/                         .../botsmith-sdk/go  (+ /management)  · entrega 2
 │   └── internal/               Interno, no importable desde afuera.
-├── python/                     chasky-bot + chasky-botsmith     · entrega 3
+├── python/                     chasky_botsmith (+ .management)  · entrega 3
 │   └── _core/                  Interno por convención.
 └── reference/
     └── pepibot/                Cliente de conformidad (pendiente D5)
 ```
 
 **Nota de nombre**: `BotSmith` nombra al **producto de bots completo**, y por eso
-da nombre al repo. No nombra a la superficie de gestión, aunque la ruta del
-servidor sea `/bot-management` y el dominio del servidor use ese término — el
-nombre del paquete de gestión está en revisión (D13, §12 del contrato).
+da nombre tanto al repo como al artefacto publicable. En el repo del servidor
+`botsmith` nombra otra cosa —la superficie de gestión, `/bot-management`—, así
+que los dos sentidos conviven entre repos y conviene tenerlo presente al saltar
+de uno al otro.
 
-Cada lenguaje publica **dos** paquetes —runtime y gestión— y guarda lo poco que
-comparten en un módulo **interno y no publicado**. El motivo de la separación
+Cada lenguaje publica **un** artefacto con **dos entrypoints** —runtime en la
+raíz, gestión en `/management`— y guarda lo poco que comparten en un módulo
+**interno y no publicado**. Que compartan artefacto no las hace una sola cosa:
+los requisitos R-A a R-D del §6 del contrato son lo que mantiene la separación
+real. El motivo de la separación
 está en el §6 del contrato, y no es prolijidad: los envelopes son incompatibles y
 el `409` significa lo contrario en cada superficie. Ese módulo interno **no puede
 exponer la superficie de un paquete al otro**; si empieza a crecer, es señal de

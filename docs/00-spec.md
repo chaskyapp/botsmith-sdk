@@ -365,22 +365,40 @@ de Go nace mirándolo, no siendo él (D5, §12).
 
 ## 6. Decisión — superficie mínima y empaquetado
 
-**CERRADA: dos paquetes por lenguaje, y solo el primero en la primera entrega.**
+**CERRADA: un artefacto publicable por lenguaje, con dos entrypoints separados.**
 
-### Paquete 1 — runtime del bot (primera entrega)
+### Entrypoint raíz — runtime del bot (primera entrega)
 
 Credencial: el token, en la ruta. Superficie: `getMe`, `getUpdates`,
 `sendMessage`, `sendChatAction`, más todo el andamiaje del §7.
 
-### Paquete 2 — gestión (después, y solo si hay demanda)
+### Subpath `/management` — gestión (después, y solo si hay demanda)
 
 Credencial: **sesión humana + `X-Secret`**. Superficie: los seis endpoints de
 `/bot-management`.
 
-### Por qué son dos y no uno
+### Un paquete, dos entrypoints
 
-No son dos partes del mismo SDK: **son dos sistemas distintos que casualmente
-hablan del mismo objeto.** El contraste, verificado contra el servidor:
+**CERRADA (D13): un solo artefacto publicable por lenguaje, con dos puntos de
+entrada separados.** El paquete se llama como el producto —BotSmith (D9)— y las
+dos superficies son subpaths.
+
+| | Runtime | Gestión |
+|---|---|---|
+| npm | `@chasky/botsmith` | `@chasky/botsmith/management` |
+| Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/management` |
+| PyPI | `chasky_botsmith` | `chasky_botsmith.management` |
+
+Dos ventajas sobre publicar paquetes separados: el nombre del producto **es** el
+nombre del paquete, y los tres ecosistemas quedan simétricos. En Go un módulo con
+subpaquete ya era lo natural; ahora npm y PyPI lo espejan en vez de inventar cada
+uno su forma.
+
+### Por qué las dos superficies siguen separadas por dentro
+
+Compartir el artefacto **no** las hace una sola cosa. Siguen siendo dos sistemas
+distintos que casualmente hablan del mismo objeto, y el contraste está verificado
+contra el servidor:
 
 | | Runtime | Gestión |
 |---|---|---|
@@ -393,93 +411,68 @@ hablan del mismo objeto.** El contraste, verificado contra el servidor:
 | Forma | REST con métodos | máquina de estados con CAS |
 | Quién lo corre | el proceso del bot, 24/7 | un humano, una vez |
 
-Cuatro razones, en orden de peso:
+De ahí salen **cuatro requisitos de implementación**, no sugerencias. Son lo que
+hace que un artefacto compartido no reintroduzca los problemas que la separación
+evitaba:
 
-**1. Los envelopes son incompatibles, y el `409` significa lo contrario en cada
-superficie.** Esta razón no es un juicio de diseño: es un hecho del servidor.
+**R-A. Constructores separados, jamás uno que acepte las dos credenciales.**
+`createBot({ token })` y `createManagementClient({ session, apiSecret })`. Nunca
+un constructor único que reciba token *o* sesión+secreto: ese era el riesgo real,
+y sobrevive intacto dentro de un solo paquete si se lo permite. Con dos
+constructores, mandar el `X-Secret` desde el proceso del bot vuelve a ser algo
+que hay que escribir a propósito.
 
-Un envelope tiene `result` y el otro `data`. Uno codifica el error como número y
-el otro como string dentro de un objeto anidado. Un cliente HTTP no puede parsear
-los dos sin ramificar en la primera línea.
+Importa por la asimetría del daño: un **token** filtrado deja mandar mensajes como
+ese bot —malo, acotado, se cierra rotando—; el **`X-Secret`** es un secreto de
+*plataforma*, y no es el mismo incidente.
 
-Y encima:
+**R-B. Tipos de error distintos por superficie.** `ChaskyApiError` (runtime,
+`code` numérico) y `ManagementError` (gestión, `code` string). No comparten clase
+base con un campo `code` común.
 
-| `409` en… | Código | Qué significa | Qué debe hacer el cliente |
+Es el requisito que neutraliza el peor riesgo de compartir paquete:
+
+| `409` en… | Código | Significa | El cliente debe |
 |---|---|---|---|
 | Runtime | `CONFLICT_POLLING` | otra instancia te desplazó | **detenerse**, jamás reintentar |
 | Gestión | `STALE_STATE` | tu `expectedRevision` está viejo | **releer y reintentar** |
 
-**Es el mismo número con la instrucción opuesta.** En un paquete único queda un
-`ChaskyError` con `code: 409` cuyo manejo correcto depende de qué endpoint lo
-produjo — y el día que alguien escriba un `if (code === 409) retry()` compartido,
-rompe el runtime de la peor forma posible: la guerra de expulsiones del §3.1.
+**Mismo número, instrucción opuesta.** Con un tipo de error compartido, un
+`if (err.code === 409) retry()` escrito para la gestión y reusado en el runtime
+mete a dos instancias en la guerra de expulsiones del §3.1. Con tipos distintos,
+ese `if` no compila contra la superficie equivocada. Los envelopes ya son
+distintos, así que los tipos separados salen del contrato, no de la disciplina.
 
-**2. Credenciales distintas, y el daño de filtrarlas no es simétrico.** Un
-paquete único obliga a un constructor que acepta token *o* sesión+secreto, y eso
-hace **escribible** el peor error del sistema: mandar el `X-Secret` de plataforma
-desde el proceso del bot, que corre en el servidor de un tercero.
+**R-C. El runtime no importa nada del subpath de gestión.** Verificable con un
+test, no con una convención. Así el código de gestión no entra al bundle de quien
+solo corre un bot, y la dirección de la dependencia queda escrita.
 
-- **Token filtrado**: el atacante manda mensajes como ese bot. Malo, acotado, se
-  cierra rotando el token.
-- **`X-Secret` filtrado**: es un secreto de **plataforma**, no de un bot. No es el
-  mismo incidente.
+**R-D. Lo poco que comparten vive en el módulo interno** (`core/`, `internal/`,
+`_core/`): redacción del token, backoff, cliente HTTP. Nunca envelopes, nunca
+tipos de error, nunca credenciales. **Si ese módulo empieza a crecer, es señal de
+que algo que debía quedar separado se está filtrando.**
 
-Es la llave del departamento y la llave maestra del edificio: las dos abren
-puertas, y no van en el mismo llavero. Con dos paquetes ese error **no se puede
-ni tipear** — el paquete del runtime no tiene un campo donde poner el `X-Secret`.
+### Orden de entrega
 
-Y no es criterio importado: **es el mismo razonamiento de radio de impacto que el
-servidor ya aplicó** al decidir que `setWebhook` no va en la superficie del token
-(`12-webhook-delivery.md`, Req.W1). Esto lo respeta del lado del cliente.
-
-**3. Audiencias distintas.** El runtime lo instala el autor del bot en su
-servidor. La gestión la usa quien provisiona bots — que puede ser otra persona:
-BotSmith separa explícitamente al dueño (sesión humana) del portador del token.
-
-**4. Formas distintas.** `/bot-management/commands` no es REST: es un diálogo con
-estado, `operationID`, `expectedRevision` y CAS optimista. Modelarlo bien es un
-trabajo propio, y no debería demorar la primera entrega del runtime.
-
-### El contraargumento, y qué se hace con él
-
-Dos paquetes son dos publicaciones, dos versiones y más ceremonia. Y comparten
-código: redacción del token, backoff, cliente HTTP.
-
-Comparten **menos de lo que parece** — el envelope, que es el corazón del parseo,
-es distinto en los dos. Lo que sí se repite son unas 50 líneas. Van a un paquete
-**interno y no publicado** (`js/core/`, `go/internal/`, `python/_core/`), del que
-ninguno de los dos paquetes públicos expone la superficie del otro.
-
-La alternativa —un paquete con dos entrypoints, `@chasky/bot` y
-`@chasky/bot/smith`— ahorra esa ceremonia y **pierde la garantía**: el código de
-gestión ya está instalado en el proceso del bot, así que el `X-Secret` vuelve a
-ser algo que alguien puede pasarle. Es una ceremonia menos a cambio de la razón 2
-entera.
+El runtime va primero y la gestión después, aunque viajen en el mismo artefacto:
+el subpath puede aparecer en una versión posterior sin romper a nadie.
 
 **Por qué BotSmith no es urgente:** casi todos los autores crean el bot **una
 vez**, a mano, en el portal. La automatización por código sirve para un caso
 concreto —CI que provisiona bots por entorno— y hasta que ese caso exista es
 superficie que se mantiene sin usarse.
 
-### Nombres por ecosistema
+### Nombre y estándar
 
-Los dos paquetes existen en los tres lenguajes, con el nombre que cada ecosistema
-espera. El nombre cambia; la separación de credenciales no.
+El artefacto se llama como el producto —**BotSmith**, D9— y las superficies son
+subpaths debajo. El scope `@chasky/` de npm está **confirmado disponible**
+(2026-09-08); los nombres concretos están en la tabla de "Un paquete, dos
+entrypoints", arriba.
 
-El estándar es **la identidad `chasky` + el rol en una palabra** (`bot` para el
-runtime, `botsmith` para la gestión), escrito como cada ecosistema lo escribe.
-El scope `@chasky/` de npm está **confirmado disponible** (2026-09-08), y es el
-que fija el estándar para los otros dos.
-
-**Pendiente, D13:** desde que `botsmith` pasó a nombrar al producto completo
-(D9), el paquete de **gestión** necesita otro nombre. La recomendación es
-`bot-management`, que es como se llama la ruta que consume.
-
-| | Runtime | Gestión |
-|---|---|---|
-| npm | `@chasky/bot` ✅ | `@chasky/botsmith` — **en revisión, D13** |
-| Go | `github.com/chaskyapp/botsmith-sdk/go` (`package chaskybot`) | `.../botsmith-sdk/go/botsmith` |
-| PyPI | `chasky-bot` | `chasky-botsmith` |
+Para cualquier subpath futuro, el estándar es **el rol en una palabra, en el
+idioma del contrato**: `management` porque espeja `/bot-management`, que es la
+ruta que consume. No se inventa vocabulario nuevo cuando el servidor ya nombró
+la superficie.
 
 ---
 
@@ -754,8 +747,8 @@ del servidor:
   hoy deja mandar mensajes como el bot —malo, acotado, se cierra rotando—; si
   además dejara registrar webhook, el atacante redirige **todo el tráfico
   entrante** a su servidor y lee las conversaciones sin que el dueño lo note.
-  Cuando exista, la configuración de webhook vive en `@chasky/botsmith`, no en
-  `@chasky/bot`.
+  Cuando exista, la configuración de webhook vive en el subpath de **gestión**,
+  no en el entrypoint del runtime.
 - Cuando un bot está en modo webhook, `getUpdates` responde **error explícito**,
   no lista vacía. El SDK tiene que traducir ese error a un mensaje que diga
   "estás preguntando por el canal equivocado", porque una lista vacía se lee como
@@ -775,7 +768,7 @@ de código.
 |---|---|---|---|
 | **D1** | Lenguajes y orden | **TS → Go → Python**, los tres | El segundo puerto es el que valida la conformidad; Go es el segundo más barato. §5 |
 | **D2** | ¿Compatible con Telegram o nativo? | **Nativo**, con el modelo mental de Telegram | Los ids son string vs número; toda coerción es error silencioso. §4 |
-| **D3** | Superficie | **Dos paquetes por lenguaje**; runtime primero, gestión después | Envelopes incompatibles y un `409` que significa lo opuesto en cada superficie; y un paquete único hace *escribible* mandar el `X-Secret` desde el proceso del bot. §6 |
+| **D3** | Superficie | **Dos superficies separadas**; runtime primero, gestión después | Envelopes incompatibles y un `409` que significa lo opuesto en cada una. El *cómo* se empaquetan lo fija **D13**; la separación se sostiene con los requisitos R-A a R-D del §6 |
 | **D4** | Webhook | **Seam de transporte, sin comprometer forma** | El servidor no lo construyó todavía. §11 |
 | **D5** | Destino de pepibot | **Cliente de conformidad** en `reference/pepibot/`, no semilla de `sdk/go` | Es el único cliente que corre contra las dos plataformas, y el SDK nativo pierde esa capacidad. El movimiento efectivo es tarea de la entrega 2 (abajo) |
 | **D6** | Dedup por `update_id` | **Umbral `> lastSeen`**: un entero, sin estructura de datos | Verificado en el código (abajo). Es más barato **y** más correcto que una ventana finita |
@@ -783,7 +776,8 @@ de código.
 | **D8** | `http://` no local | **Advertir una vez**, no negarse; opción explícita para silenciar | Negarse rompe staging interno legítimo — TLS terminado en el ingress, túneles, compose |
 | **D9** | Layout y nombres | **Monorepo `botsmith-sdk`** —BotSmith nombra al **producto de bots completo**, no solo al gestor—, un directorio por lenguaje en la raíz; scope npm **`@chasky/`** confirmado disponible | Tres puertos del mismo contrato, mismo equipo, al mismo tiempo. Detalle en `01-organizacion.md` |
 | **D10** | Formato de la conformidad | **Casos JSON** + un fake HTTP por lenguaje | Idiomático y sin proceso externo. Decisión **reversible** (abajo) |
-| **D11** | Versionado | **Independiente por paquete** + versión del contrato declarada aparte | La pregunta que importa no es qué versión tiene el paquete, sino qué garantías implementa |
+| **D11** | Versionado | **Independiente por lenguaje** + versión del contrato declarada aparte | Un artefacto por lenguaje (D13), así que el semver es por lenguaje: un fix de empaquetado en Python no fuerza releases vacíos en TS y Go. La pregunta que importa —¿garantizan lo mismo?— la contesta la versión del contrato |
+| **D13** | Empaquetado de las dos superficies | **Un artefacto por lenguaje, dos entrypoints**: `@chasky/botsmith` y `@chasky/botsmith/management` | El paquete se llama como el producto (D9) y los tres ecosistemas quedan simétricos. Reemplaza a D3 en el *cómo*; los requisitos R-A a R-D del §6 conservan la separación real por dentro |
 
 #### Verificación de D6 (2026-09-08)
 
@@ -868,10 +862,10 @@ empiezan a divergir, se migra al binario único con los mismos casos.
 
 #### D11 — versión de paquete y versión de contrato
 
-Cada paquete lleva su semver y se publica cuando tiene algo que publicar: un fix
-de empaquetado en Python no fuerza releases vacíos en TypeScript y Go.
+Cada lenguaje publica un artefacto (D13) con su propio semver: un fix de
+empaquetado en Python no fuerza releases vacíos en TypeScript y Go.
 
-Aparte, cada paquete declara **contra qué versión del contrato** cumple, y los
+Aparte, cada artefacto declara **contra qué versión del contrato** cumple, y los
 casos de conformidad declaran a qué versión pertenecen. Eso responde la única
 pregunta que de verdad importa entre tres implementaciones: *¿estos dos SDKs
 garantizan lo mismo?* — que la versión del paquete no contesta.
@@ -883,7 +877,6 @@ La versión del contrato es `MAJOR.MINOR`: **MINOR** cuando se agrega una garant
 
 | # | Decisión | Recomendación | Qué falta |
 |---|---|---|---|
-| **D13** | Nombre del paquete de **gestión** | **`@chasky/bot-management`** / `.../go/management` / `chasky-bot-management` | Consecuencia directa de D9. Con `botsmith` nombrando al producto entero, ya no puede nombrar también a una de sus dos partes: `botsmith-sdk/go/botsmith` diría *botsmith* dos veces significando cosas distintas en cada nivel. La recomendación **espeja la ruta que consume** (`/bot-management`), así que no inventa vocabulario. Choca con que ya confirmaste `@chasky/botsmith` disponible en npm — por eso queda abierta y no la cierro yo |
 | **D12** | Traducir `docs/` al inglés | **DISPARADA el 2026-09-08**: D5, D7, D8, D10 y D11 cerraron, así que esto es lo único pendiente. Incluye renombrar `01-organizacion.md` → `01-organization.md`, actualizar los enlaces y quitar los avisos *"(in Spanish for now)"* de los READMEs | Ya no espera nada. Queda en esta lista hasta ejecutarse, que es exactamente para lo que estaba: un paso pendiente que no se cuenta es un paso que se olvida |
 
 ---
