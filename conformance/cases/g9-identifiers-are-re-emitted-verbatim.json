@@ -3,7 +3,7 @@
   "contractVersion": "1.0",
   "guarantee": "G9",
   "title": "A chat id is sent back exactly as received, never coerced",
-  "why": "Chasky ids are strings and Telegram's are numbers. Any coercion is a SILENT error: it throws nothing, it just addresses the wrong chat or none at all. The id here is deliberately all digits — the shape most likely to tempt a JSON layer, or a porting author, into turning it into a number.",
+  "why": "Chasky ids are strings and Telegram's are numbers. Any coercion is a SILENT error: it throws nothing, it just addresses the wrong chat or none at all. Two shapes here, both taken from real temptation: an all-digit id, which invites a JSON layer or a porting author to make it a number; and a real chat id observed live, which carries the bot: prefix TWICE (once from the conversation, once from inside the botID) and therefore breaks anyone who 'understands' the format well enough to split it apart.",
   "bot": {
     "transport": "polling",
     "options": {
@@ -43,6 +43,22 @@
                 "date": 1757376000,
                 "text": "five"
               }
+            },
+            {
+              "update_id": 6,
+              "message": {
+                "message_id": "botmsg:0a621ee28afcb8f67c3f9cc1d6947ffb515a5da7e83d9a8a56723c0af8b00632",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:bot:1a140818-63c7-48d7-aee9-5a3e27885501:3a532be3-19cb-4dfc-a23e-9fd9424fd5bc",
+                  "type": "private"
+                },
+                "date": 1757376000,
+                "text": "six"
+              }
             }
           ]
         }
@@ -80,9 +96,38 @@
     {
       "expect": {
         "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "bot:bot:1a140818-63c7-48d7-aee9-5a3e27885501:3a532be3-19cb-4dfc-a23e-9fd9424fd5bc",
+          "text": "six"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r6",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi"
+            },
+            "chat": {
+              "id": "bot:bot:1a140818-63c7-48d7-aee9-5a3e27885501:3a532be3-19cb-4dfc-a23e-9fd9424fd5bc",
+              "type": "private"
+            },
+            "date": 1757376001,
+            "text": "six"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
         "path": "/bot{token}/getUpdates",
         "body": {
-          "offset": 6
+          "offset": 7
         }
       },
       "respond": {

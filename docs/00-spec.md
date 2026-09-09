@@ -630,10 +630,27 @@ to read in full before writing a bot.
 **One rule: in Chasky every identifier is a `string`, and the SDK never converts
 them.** It receives strings, stores strings, re-emits strings.
 
-`chat.id` has the shape `bot:{botID}:{userID}` and `from.id` has the shape
-`bot:{uuid}` for the bot. **That is observable structure, not contract**: the SDK
-does not parse ids to infer anything, the same way the server has an explicit
-rule against parsing ids to authorise. An id is an opaque label.
+Observed against a live server on 2026-09-09, and worth reproducing exactly
+because the shape is not what a careful reading of the server spec suggests:
+
+```
+chat.id     bot:bot:1a140818-…-5a3e27885501:3a532be3-…-9fd9424fd5bc
+from.id     3a532be3-…-9fd9424fd5bc          (the human: a bare uuid)
+message_id  botmsg:0a621ee28afcb8f6…
+```
+
+**`chat.id` carries `bot:` twice.** The server spec says the conversation id is
+`bot:{botID}:{userID}` and, separately, that `Bot.ID` is `bot:{uuid}` — so the
+prefix appears once from the conversation and once from inside the botID. Both
+statements are correct; substituting them is what surprises.
+
+**That is observable structure, not contract**, and this is the case that proves
+why the distinction matters. The SDK never parsed these ids, so the double prefix
+cost it nothing — it round-tripped the string and the bot worked on the first
+try. An SDK that had "understood" the format well enough to split out the botID
+would have broken here, silently, on a real server. The server holds the same
+rule for itself: it does not parse ids to authorise. **An id is an opaque
+label.**
 
 **`flexID` is not ported.** pepibot's type, which remembers whether an id arrived
 as a string or a number, solves a problem that only exists when one binary talks
