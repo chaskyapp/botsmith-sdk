@@ -671,12 +671,23 @@ declares the description readable and stable, but not enumerated.
 
 ### 10.2 Classification
 
+**Classification is by code *and by which call produced it*, never by
+`description`.** An earlier draft of this table split `403` into
+`BOT_SUSPENDED` (terminal) and `CHAT_FORBIDDEN` (business), which contradicted
+§10.1: the server does not declare `description` enumerated, so flow control
+must not read it. The **method** resolves it without touching the string, and
+more robustly.
+
 | Class | Codes | What the SDK does |
 |---|---|---|
-| Terminal | `401`, `403 BOT_SUSPENDED` | Stops the bot, fires `onFatal`. No retry. |
-| Terminal — evicted | `409 CONFLICT_POLLING` | Stops the bot. **Never retries**: retrying is an eviction war (§3.1). The message says "another instance took over polling", not "configuration error". |
-| Business | `400`, `403 CHAT_FORBIDDEN`, `404` | Returns the error to the caller. No retry: retrying an empty `text` yields an empty `text`. |
+| Terminal | `401`, `403`, `409` — **from the poll** | Stops the bot, fires `onFatal`. No retry. A `409 CONFLICT_POLLING` retried is an eviction war (§3.1), and the message says "another instance took over polling", not "configuration error". |
+| Business | `400`, `403`, `404` — **from a single call** | Returns the error to the caller. No retry: retrying an empty `text` yields an empty `text`. |
 | Transient | `500`, `5xx`, network, timeout | Exponential backoff with jitter, **reusing the same `Idempotency-Key`**. |
+
+The reasoning: a `403` while **polling** means this bot is barred from polling at
+all — terminal. A `403` from a **send** means that one chat is not ours — the bot
+lives on. Same shape for `401`. Reading the method is both correct and immune to
+a description the server never promised to keep enumerated.
 
 ### 10.3 Redaction — mandatory, not optional
 

@@ -244,9 +244,12 @@ languages.
 1. ~~Close the contract's decisions.~~ **Done**: all thirteen are resolved.
 2. Write the conformance cases **before** the SDK. They come from §8 of the
    contract, not from the implementation.
-3. TypeScript conformance runner.
-4. `@chasky/botsmith`: raw client, then runtime.
-5. Run against a real local server, with pepibot's full flow.
+3. ~~TypeScript conformance runner.~~ **Done**, and validated: 2/11 against the
+   naive fixture, so the suite is known to discriminate rather than rubber-stamp.
+4. ~~`@chasky/botsmith`: raw client, then runtime.~~ **Done**: 11/11 conformance.
+5. Run against a real local server, with pepibot's full flow. **Next.** Conformance
+   proves the SDK against a fake that answers what the cases declare; only a real
+   server proves the cases describe the real one.
 
 ### Delivery 2 — Go
 

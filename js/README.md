@@ -1,6 +1,7 @@
 # `@chasky/botsmith` — TypeScript SDK
 
-**Delivery 1. The conformance runner is written; the SDK is not.**
+**Delivery 1. Runtime implemented — 11/11 conformance. Not yet run against a
+real server, and `/management` does not exist yet.**
 
 Written in TypeScript, publishing compiled JS plus `.d.ts`. The types are **part
 of the public contract**, not documentation: half the traps this SDK exists to
