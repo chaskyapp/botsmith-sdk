@@ -196,5 +196,10 @@ def _parse_command(text: str) -> str:
     stripped = text.strip()
     if not stripped.startswith("/"):
         return ""
-    name = stripped[1:].split(maxsplit=1)[0] if len(stripped) > 1 else ""
+    # split() on whitespace-only returns [], so indexing it would raise on a
+    # message that is just "/ ". Take the head defensively.
+    parts = stripped[1:].split()
+    if not parts:
+        return ""
+    name = parts[0]
     return name if name.replace("_", "").isalnum() else ""
