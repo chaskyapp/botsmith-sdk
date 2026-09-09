@@ -649,6 +649,9 @@ message_id  botmsg:0a621ee28afcb8f6…
 prefix appears once from the conversation and once from inside the botID. Both
 statements are correct; substituting them is what surprises.
 
+All three SDKs were run against a live server on 2026-09-09 and printed the same
+shape, so the mapping is verified three times over rather than assumed once.
+
 **That is observable structure, not contract**, and this is the case that proves
 why the distinction matters. The SDK never parsed these ids, so the double prefix
 cost it nothing — it round-tripped the string and the bot worked on the first

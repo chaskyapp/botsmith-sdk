@@ -247,9 +247,12 @@ languages.
 3. ~~TypeScript conformance runner.~~ **Done**, and validated: 2/11 against the
    naive fixture, so the suite is known to discriminate rather than rubber-stamp.
 4. ~~`@chasky/botsmith`: raw client, then runtime.~~ **Done**: 11/11 conformance.
-5. Run against a real local server, with pepibot's full flow. **Next.** Conformance
-   proves the SDK against a fake that answers what the cases declare; only a real
-   server proves the cases describe the real one.
+5. ~~Run against a real local server, with pepibot's full flow.~~ **Done, and
+   later repeated for Go and Python.** Conformance proves an SDK against a fake
+   that answers what the cases declare; only a real server proves the cases
+   describe the real one — which is how the doubled `bot:` prefix in `chat.id`
+   was found (§9 of the contract). All three now print the same wire shape
+   against the same server.
 
 ### Delivery 2 — Go
 

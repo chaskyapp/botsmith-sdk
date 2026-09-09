@@ -56,6 +56,13 @@ The smoke tests prove the other half: that the cases describe the **real**
 server. A case written from a misreading of the spec passes conformance and
 fails here.
 
+**All three have been run against a live server (2026-09-09) and print the same
+wire shape** — same `chat.id` with its doubled `bot:` prefix intact, same types
+on every field, same reading of `date` as seconds. Only `update_id` and
+`message_id` differ, because they were different messages. Three independent
+mappings agreeing against the real server is what the conformance suite alone
+could not establish.
+
 ## The three things that matter most
 
 1. **One process per bot, and starting up displaces whoever was there.** Since
