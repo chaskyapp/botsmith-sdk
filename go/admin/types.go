@@ -3,11 +3,17 @@ package admin
 import "time"
 
 type BotView struct {
-	ID                string `json:"id"`
-	Name              string `json:"name"`
-	Username          string `json:"username"`
-	Description       string `json:"description"`
-	State             string `json:"state"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Username    string `json:"username"`
+	Description string `json:"description"`
+	State       string `json:"state"`
+	// Visibility is what the dialogue compare-and-sets when publishing, as
+	// State is when archiving.
+	Visibility string `json:"visibility"`
+	// WebhookURL is the destination. The SECRET appears here in no view.
+	WebhookURL        string `json:"webhookUrl"`
+	WebhookState      string `json:"webhookState"`
 	CredentialState   string `json:"credentialState"`
 	CredentialVersion int64  `json:"credentialVersion"`
 	MetadataVersion   int64  `json:"metadataVersion"`
@@ -16,6 +22,13 @@ type BotView struct {
 type Capability struct {
 	Enabled                 bool `json:"enabled"`
 	CanManageAdministrators bool `json:"canManageAdministrators"`
+	// MaxBots lets a client warn BEFORE the user spends four steps typing a
+	// name and username only to be refused at confirm. The cap is still the
+	// backend's: this announces it, it does not decide it.
+	MaxBots int `json:"maxBots"`
+	// WebhookEnabled announces the gate so a client does not offer a button
+	// that always fails.
+	WebhookEnabled bool `json:"webhookEnabled"`
 }
 
 type BotPage struct {
@@ -35,6 +48,7 @@ const (
 	StepBotMenu         Step = "bot_menu"
 	StepEditName        Step = "edit_name"
 	StepEditDescription Step = "edit_description"
+	StepWebhookURL      Step = "webhook_url"
 	StepConfirmChange   Step = "confirm_change"
 )
 
@@ -126,5 +140,9 @@ const (
 	CommandRevoke      CommandKind = "revoke"
 	CommandArchive     CommandKind = "archive"
 	CommandUnarchive   CommandKind = "unarchive"
+	CommandPublish     CommandKind = "publish"
+	CommandUnpublish   CommandKind = "unpublish"
+	CommandWebhook     CommandKind = "webhook"
+	CommandUnwebhook   CommandKind = "unwebhook"
 	CommandConfirm     CommandKind = "confirm"
 )

@@ -10,6 +10,11 @@ export interface BotView {
   username: string;
   description: string;
   state: string;
+  /** What the dialogue compare-and-sets when publishing, as `state` is for archiving. */
+  visibility: string;
+  /** The destination. The SECRET never appears here or in any view. */
+  webhookUrl: string;
+  webhookState: string;
   credentialState: string;
   credentialVersion: number;
   metadataVersion: number;
@@ -18,6 +23,14 @@ export interface BotView {
 export interface Capability {
   enabled: boolean;
   canManageAdministrators: boolean;
+  /**
+   * Published so a client can warn BEFORE the user spends four steps typing a
+   * name and username only to be refused at confirm. The cap is still the
+   * backend's: this announces it, it does not decide it.
+   */
+  maxBots: number;
+  /** Announces the gate so a client does not offer a button that always fails. */
+  webhookEnabled: boolean;
 }
 
 export interface Page<T> {
@@ -35,6 +48,7 @@ export type DialogueStep =
   | "bot_menu"
   | "edit_name"
   | "edit_description"
+  | "webhook_url"
   | "confirm_change";
 
 export type OperationState = "pending" | "completed" | "rejected";
@@ -108,4 +122,8 @@ export type CommandKind =
   | "revoke"
   | "archive"
   | "unarchive"
+  | "publish"
+  | "unpublish"
+  | "webhook"
+  | "unwebhook"
   | "confirm";

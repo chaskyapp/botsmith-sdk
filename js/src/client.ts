@@ -8,8 +8,10 @@ import type {
   Envelope,
   MessageID,
   Update,
+  WebhookInfo,
   WireBotMessage,
   WireUpdate,
+  WireWebhookInfo,
 } from "./types.js";
 
 /**
@@ -107,6 +109,25 @@ export class ChaskyBotClient {
 
     const raw = await this.call<WireBotMessage>("sendMessage", body, { headers, signal: options.signal });
     return toBotMessage(raw);
+  }
+
+  /**
+   * Reports the bot's webhook state. Empty `state` means it is still polling.
+   *
+   * The one method with no conformance case until 2026-09-10, because the
+   * contract did not know the surface existed.
+   */
+  async getWebhookInfo(signal?: AbortSignal): Promise<WebhookInfo> {
+    const raw = await this.call<WireWebhookInfo>("getWebhookInfo", {}, { signal });
+    const info: WebhookInfo = {
+      url: raw.url ?? "",
+      hasSecretToken: raw.has_secret_token ?? false,
+      pendingUpdateCount: raw.pending_update_count ?? 0,
+    };
+    if (raw.last_error_date) info.lastErrorDate = new Date(raw.last_error_date * 1000);
+    if (raw.last_error_message) info.lastErrorMessage = raw.last_error_message;
+    if (raw.state) info.state = raw.state as "active" | "suspended";
+    return info;
   }
 
   async sendChatAction(

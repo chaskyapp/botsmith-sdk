@@ -9,12 +9,13 @@ T = TypeVar("T")
 
 CommandKind = Literal[
     "/newbot", "/mybots", "/help", "/cancel", "value", "select", "name",
-    "description", "issue", "rotate", "revoke", "archive", "unarchive", "confirm",
+    "description", "issue", "rotate", "revoke", "archive", "unarchive",
+    "publish", "unpublish", "webhook", "unwebhook", "confirm",
 ]
 
 DialogueStep = Literal[
     "menu", "new_name", "new_username", "confirm_create", "select_bot",
-    "bot_menu", "edit_name", "edit_description", "confirm_change",
+    "bot_menu", "edit_name", "edit_description", "webhook_url", "confirm_change",
 ]
 
 OperationState = Literal["pending", "completed", "rejected"]
@@ -27,6 +28,12 @@ class BotView:
     username: str
     description: str
     state: str
+    #: What the dialogue compare-and-sets when publishing, as ``state`` is when
+    #: archiving.
+    visibility: str
+    #: The destination. The SECRET appears here in no view.
+    webhook_url: str
+    webhook_state: str
     credential_state: str
     credential_version: int
     metadata_version: int
@@ -36,6 +43,11 @@ class BotView:
 class Capability:
     enabled: bool
     can_manage_administrators: bool
+    #: Lets a client warn BEFORE the user spends four steps typing a name and
+    #: username only to be refused at confirm. The cap is still the backend's.
+    max_bots: int
+    #: Announces the gate so a client does not offer a button that always fails.
+    webhook_enabled: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +162,9 @@ def bot_from_wire(raw: dict[str, Any]) -> BotView:
         username=raw.get("username", ""),
         description=raw.get("description", ""),
         state=raw.get("state", ""),
+        visibility=raw.get("visibility", ""),
+        webhook_url=raw.get("webhookUrl", ""),
+        webhook_state=raw.get("webhookState", ""),
         credential_state=raw.get("credentialState", ""),
         credential_version=raw.get("credentialVersion", 0),
         metadata_version=raw.get("metadataVersion", 0),

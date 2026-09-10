@@ -80,6 +80,8 @@ class AdminClient:
         return Capability(
             enabled=data.get("enabled", False),
             can_manage_administrators=data.get("canManageAdministrators", False),
+            max_bots=data.get("maxBots", 0),
+            webhook_enabled=data.get("webhookEnabled", False),
         )
 
     async def bots(self, params: PageParams | None = None) -> Page[BotView]:

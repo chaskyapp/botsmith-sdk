@@ -21,4 +21,5 @@ export type {
   Update,
   UpdateID,
   UserID,
+  WebhookInfo,
 } from "./types.js";

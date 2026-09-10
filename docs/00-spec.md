@@ -61,6 +61,7 @@ POST <base>/bot<TOKEN>/getMe
 POST <base>/bot<TOKEN>/getUpdates
 POST <base>/bot<TOKEN>/sendMessage
 POST <base>/bot<TOKEN>/sendChatAction
+POST <base>/bot<TOKEN>/getWebhookInfo
 ```
 
 The token travels **in the path** and is the **only** credential. These routes
@@ -741,14 +742,48 @@ it explicitly with `allowInsecureTransport: true`.
 
 ---
 
-## 11. Webhook: the reserved seam, with no commitment to shape
+## 11. Webhook
 
-Chasky has **no** outbound webhook delivery today. It is specified and unbuilt in
-the server's `docs/sdd/botapi/botsmith/12-webhook-delivery.md`. The SDK leaves the
-seam and promises nothing more.
+**Corrected 2026-09-10.** Every earlier version of this section said Chasky had
+no outbound webhook delivery. **It has.** Deltas 12, 18, 19 and 20 in the server
+repo specify, design, implement and gate it, and the runtime has a fifth method:
 
-**What is committed:** the transport is a parameter, and the author's handlers do
-not change when it changes.
+```
+POST <base>/bot<TOKEN>/getWebhookInfo   ->  WebhookInfo
+```
+
+```
+WebhookInfo {
+  url, has_secret_token, pending_update_count,
+  last_error_date?, last_error_message?, state?
+}
+```
+
+Three details the server is explicit about, and the SDK repeats rather than
+smooths over:
+
+- **`has_secret_token` answers "is one configured", never "which one".**
+- **`last_error_*` describe the LAST RUN of failures, not all time**: a
+  successful delivery clears them. An error from three days ago next to a
+  working webhook would confuse more than it explains.
+- **An empty `state` means the bot has no destination registered and is still
+  polling.** `active` and `suspended` are the webhook states.
+
+What this section got right, and why it cost nothing to be wrong: **D4 kept the
+webhook as a transport seam with no commitment to its shape.** So there is
+nothing to unpick — only something to add. Had the SDK invented a webhook API
+back then, it would be wrong now in a way that shipped.
+
+### How the SDK was wrong about this at all
+
+Nineteen conformance cases were green while the contract declared a whole
+surface nonexistent, because every one of them answers against this SDK's own
+fake. The live smokes did not catch it either: they exercise the four methods
+the contract knew about. **A test can only contradict an assumption it was told
+to make.**
+
+**What is still true, and is what D4 bought:** the transport is a parameter, and
+the author's handlers do not change when it changes.
 
 ```ts
 createBot({ token, transport: polling({ ... }) })    // today

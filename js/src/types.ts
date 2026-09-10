@@ -48,6 +48,37 @@ export interface BotIdentity {
 
 export type ChatAction = "typing";
 
+/**
+ * What `getWebhookInfo` reports.
+ *
+ * An empty `state` means the bot has no destination registered and is still
+ * polling; `active` and `suspended` are the webhook states. `hasSecretToken`
+ * answers "is one configured", never "which one" — the server does not reveal
+ * it and neither does this.
+ */
+export interface WebhookInfo {
+  url: string;
+  hasSecretToken: boolean;
+  pendingUpdateCount: number;
+  /**
+   * The LAST RUN of failures, not all time: a successful delivery clears them.
+   * An error from three days ago beside a working webhook explains nothing.
+   */
+  lastErrorDate?: Date;
+  lastErrorMessage?: string;
+  /** Empty means polling. */
+  state?: "active" | "suspended";
+}
+
+export interface WireWebhookInfo {
+  url?: string;
+  has_secret_token?: boolean;
+  pending_update_count?: number;
+  last_error_date?: number;
+  last_error_message?: string;
+  state?: string;
+}
+
 /** The `{ok, result}` / `{ok:false, error_code, description}` envelope. */
 export type Envelope<T> =
   | { ok: true; result: T }
