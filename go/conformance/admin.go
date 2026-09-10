@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chaskyapp/botsmith-sdk/go/management"
+	"github.com/chaskyapp/botsmith-sdk/go/admin"
 )
 
 const (
@@ -41,14 +41,14 @@ type ManagementUnderTest interface {
 type ManagementFactory func(baseURL string) ManagementUnderTest
 
 type sdkManagement struct {
-	client   *management.Client
+	client   *admin.Client
 	results  []any
 	errs     []ReportedManagementError
 	warnings []string
 }
 
 func NewSDKManagement(baseURL string) ManagementUnderTest {
-	client, err := management.New(management.Options{
+	client, err := admin.New(admin.Options{
 		BaseURL:     baseURL,
 		APISecret:   testAPISecret,
 		BearerToken: testBearer,
@@ -73,14 +73,14 @@ func (m *sdkManagement) call(ctx context.Context, method string, args map[string
 	case "capability":
 		return m.client.Capability(ctx)
 	case "bots":
-		return m.client.Bots(ctx, management.Page{Cursor: str(args["cursor"]), Limit: intOf(args["limit"])})
+		return m.client.Bots(ctx, admin.Page{Cursor: str(args["cursor"]), Limit: intOf(args["limit"])})
 	case "bot":
 		return m.client.Bot(ctx, str(args["id"]))
 	case "dialogue":
-		return m.client.Dialogue(ctx, management.Page{Cursor: str(args["cursor"]), Limit: intOf(args["limit"])})
+		return m.client.Dialogue(ctx, admin.Page{Cursor: str(args["cursor"]), Limit: intOf(args["limit"])})
 	case "command":
-		params := management.CommandParams{
-			Command:          management.CommandKind(str(args["command"])),
+		params := admin.CommandParams{
+			Command:          admin.CommandKind(str(args["command"])),
 			ExpectedRevision: int64(intOf(args["expectedRevision"])),
 			Value:            str(args["value"]),
 			BotID:            str(args["botID"]),
@@ -92,7 +92,7 @@ func (m *sdkManagement) call(ctx context.Context, method string, args map[string
 		}
 		return m.client.Command(ctx, params)
 	case "grant":
-		return m.client.Grant(ctx, str(args["targetId"]), management.GrantParams{
+		return m.client.Grant(ctx, str(args["targetId"]), admin.GrantParams{
 			Enabled:          args["enabled"] == true,
 			ExpectedRevision: int64(intOf(args["expectedRevision"])),
 		})
@@ -109,7 +109,7 @@ func (m *sdkManagement) Describe() string {
 }
 
 func toReportedManagement(err error) ReportedManagementError {
-	var failure *management.Error
+	var failure *admin.Error
 	if errors.As(err, &failure) {
 		return ReportedManagementError{
 			ManagementCode: string(failure.Code),

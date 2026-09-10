@@ -1,4 +1,4 @@
-package management
+package admin
 
 import (
 	"bytes"
@@ -39,7 +39,7 @@ type Client struct {
 
 func New(opts Options) (*Client, error) {
 	if opts.APISecret == "" {
-		return nil, fmt.Errorf("management: an API secret is required")
+		return nil, fmt.Errorf("admin: an API secret is required")
 	}
 	httpClient := opts.HTTPClient
 	if httpClient == nil {

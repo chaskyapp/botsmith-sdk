@@ -1,4 +1,4 @@
-package management
+package admin
 
 import "time"
 
@@ -100,8 +100,8 @@ type CommandResult struct {
 	RecoveryRequired bool          `json:"recoveryRequired,omitempty"`
 }
 
-func (CommandResult) String() string   { return "[management command result redacted]" }
-func (CommandResult) GoString() string { return "[management command result redacted]" }
+func (CommandResult) String() string   { return "[admin command result redacted]" }
+func (CommandResult) GoString() string { return "[admin command result redacted]" }
 
 type GrantView struct {
 	TargetID string `json:"targetID"`
