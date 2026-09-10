@@ -97,10 +97,27 @@ imagines the need.
 
 ## Still not covered
 
-- **The management smokes have never met a real server.** Conformance proves
-  them against a fake that answers what the six `m*` cases declare; only a live
-  run proves those cases describe the real thing. That is the gap that found
-  `chat.id` carrying `bot:` twice on the runtime side, and it is still open here.
+**The management smokes have never met a real server, and are blocked on S6
+rather than merely pending.**
+
+Conformance proves them against a fake that answers what the six `m*` cases
+declare; only a live run proves those cases describe the real thing. That is the
+gap that found `chat.id` carrying `bot:` twice on the runtime side, and it is
+still open here.
+
+Running them today is possible — the server takes a session plus `X-Secret`, and
+whoever owns the instance has both — but deliberately deferred:
+
+- It would exercise a credential that S6 replaces, so the auth half of what it
+  verifies expires on arrival.
+- It requires writing the **platform secret** into a `.env`. This repo just grew
+  three guards to keep that value out of places it does not belong; asking for it
+  in a file, for a check that will be repeated once the developer key exists, is
+  the wrong trade.
+
+When S6 ships, the smokes need one change each: the header name and the
+environment variable. The calls, the shapes they print and the read-only default
+all stay.
 
 ## A note on what these cases assume
 

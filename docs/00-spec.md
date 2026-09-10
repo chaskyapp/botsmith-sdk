@@ -933,6 +933,11 @@ These come out of this analysis and are `backend-api-go` tickets, not SDK work.
   **absent** header, not only a wrong one. Full proposal, including what the SDK
   should absorb, in [`02-developer-api.md`](02-developer-api.md).
 
+  **This blocks the admin smokes.** They are written and unverified against a
+  real server, and running them today would exercise a credential S6 replaces —
+  while requiring the platform secret in a `.env`, which is what three separate
+  guards in this repo exist to prevent.
+
 ---
 
 ## 14. Out of scope for the first delivery

@@ -125,6 +125,23 @@ plainly rather than hide:
   produce `STALE_STATE`, and the facade has to re-read and retry. That is a
   behaviour worth its own conformance case before it is written.
 
+## What is waiting on this
+
+The admin smokes — `js/scripts/smoke-admin.ts`, `go/cmd/smoke-admin`,
+`python/smoke_admin.py` — are written and have never met a real server. They are
+blocked here rather than merely unfinished: running them today would authenticate
+with the credential this proposal replaces, and would require writing the
+platform secret into a `.env` for a check that has to be repeated afterwards
+anyway.
+
+When this ships they need one change each — the header name and the environment
+variable. The calls they make, the wire shapes they print and the read-only
+default all stay as they are.
+
+That matters because the runtime's live smoke is what found `chat.id` carrying
+`bot:` twice, a shape six conformance cases would otherwise still be asserting
+wrongly. The admin cases have not had that test yet.
+
 ## Recorded as S6
 
 In §13 of the contract, deliberately apart from S2–S5: those are papercuts, and
