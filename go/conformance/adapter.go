@@ -15,6 +15,10 @@ type ReportedError struct {
 type BotUnderTest interface {
 	// Start begins polling and returns immediately.
 	Start(ctx context.Context)
+	// StartAgain calls Start a second time and reports what happened. It must
+	// not block: a bot that is already running has to reject immediately, which
+	// is the whole of G1.
+	StartAgain() error
 	// Stop cancels any in-flight poll and returns once the bot is idle.
 	Stop()
 	// StoppedItself reports a bot that ended on a terminal error rather than on

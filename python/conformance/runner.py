@@ -62,6 +62,15 @@ class BotUnderTest(Protocol):
     warnings: list[str]
 
     async def start(self) -> None: ...
+
+    async def start_again(self) -> BaseException | None:
+        """Call start a second time and report what happened.
+
+        Must not block: a bot that is already running has to reject
+        immediately, which is the whole of G1.
+        """
+        ...
+
     async def stop(self) -> None: ...
 
 
@@ -84,6 +93,9 @@ async def run_case(
     fake = FakeServer(case["exchanges"])
     failures: list[Failure] = []
     bot: BotUnderTest | None = None
+    second_start_rejected = False
+    stop_duration: float | None = None
+    stopped = False
     try:
         options = case["bot"].get("options", {})
         bot = factory(
@@ -96,10 +108,25 @@ async def run_case(
             )
         )
         await bot.start()
-        timeout = case.get("run", {}).get("timeoutMs", DEFAULT_TIMEOUT * 1000) / 1000
-        await _wait_for_completion(bot, fake, timeout)
+
+        if case["bot"].get("startTwice"):
+            # Give the first loop a moment to take hold, so the second call is
+            # answering "already running" rather than winning a race.
+            await asyncio.sleep(0.05)
+            second_start_rejected = await bot.start_again() is not None
+
+        stop_after = case.get("run", {}).get("stopAfterMs")
+        if stop_after is not None:
+            await asyncio.sleep(stop_after / 1000)
+            started_stopping = asyncio.get_running_loop().time()
+            await bot.stop()
+            stop_duration = asyncio.get_running_loop().time() - started_stopping
+            stopped = True
+        else:
+            timeout = case.get("run", {}).get("timeoutMs", DEFAULT_TIMEOUT * 1000) / 1000
+            await _wait_for_completion(bot, fake, timeout)
     finally:
-        if bot is not None:
+        if bot is not None and not stopped:
             try:
                 await bot.stop()
             except Exception:  # noqa: BLE001 - stopping must never mask a real failure
@@ -108,7 +135,7 @@ async def run_case(
 
     failures.extend(_check_requests(case, fake))
     if bot is not None:
-        failures.extend(_check_assertions(case, bot))
+        failures.extend(_check_assertions(case, bot, second_start_rejected, stop_duration))
     return failures
 
 
@@ -285,9 +312,39 @@ def _check_requests(case: dict[str, Any], fake: FakeServer) -> list[Failure]:
     return failures
 
 
-def _check_assertions(case: dict[str, Any], bot: BotUnderTest) -> list[Failure]:
+def _check_assertions(
+    case: dict[str, Any],
+    bot: BotUnderTest,
+    second_start_rejected: bool = False,
+    stop_duration: float | None = None,
+) -> list[Failure]:
     failures: list[Failure] = []
     want = case.get("assert", {})
+
+    if "secondStartRejected" in want and want["secondStartRejected"] != second_start_rejected:
+        failures.append(
+            Failure(
+                "assert.secondStartRejected",
+                "the second start() succeeded; the SDK now has two polls on one bot"
+                if want["secondStartRejected"]
+                else "the second start() was rejected, but this case expected it to be allowed",
+            )
+        )
+
+    if "stoppedWithinMs" in want:
+        budget = want["stoppedWithinMs"] / 1000
+        if stop_duration is None:
+            failures.append(
+                Failure("assert.stoppedWithinMs", "this case asserts on stop() but never called it; add run.stopAfterMs")
+            )
+        elif stop_duration > budget:
+            failures.append(
+                Failure(
+                    "assert.stoppedWithinMs",
+                    f"stop() took {stop_duration * 1000:.0f}ms, over the {want['stoppedWithinMs']}ms budget — "
+                    "it is waiting out the server's response instead of cancelling the request",
+                )
+            )
 
     if "botStopped" in want and want["botStopped"] != bot.stopped_itself:
         detail = (

@@ -67,6 +67,10 @@ type Assertions struct {
 	Warnings []struct {
 		Contains string `json:"contains"`
 	} `json:"warnings"`
+	// SecondStartRejected: the second Start failed locally, with no request (G1).
+	SecondStartRejected *bool `json:"secondStartRejected"`
+	// StoppedWithinMs: Stop returned within this budget (G8).
+	StoppedWithinMs *int `json:"stoppedWithinMs"`
 }
 
 type ManagementCall struct {
@@ -90,11 +94,15 @@ type Case struct {
 			TimeoutSeconds int `json:"timeoutSeconds"`
 		} `json:"options"`
 		Handler HandlerSpec `json:"handler"`
+		// StartTwice asks the runner to call Start a second time (G1).
+		StartTwice bool `json:"startTwice"`
 	} `json:"bot"`
 	Exchanges []Exchange `json:"exchanges"`
 	Assert    Assertions `json:"assert"`
 	Run       struct {
 		TimeoutMs int `json:"timeoutMs"`
+		// StopAfterMs replaces the normal wait: sleep, then Stop and measure (G8).
+		StopAfterMs int `json:"stopAfterMs"`
 	} `json:"run"`
 }
 

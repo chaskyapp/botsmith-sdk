@@ -92,6 +92,18 @@ func (s *sdkBot) Start(ctx context.Context) {
 	}()
 }
 
+// StartAgain runs the bot with an already-cancelled context.
+//
+// If the bot is running, Run rejects before it ever looks at the context, which
+// is the answer this asks for. If it is not, the cancelled context makes Run
+// return immediately instead of blocking the suite — so the call is safe either
+// way and the two outcomes stay distinguishable.
+func (s *sdkBot) StartAgain() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	return s.bot.Run(ctx)
+}
+
 func (s *sdkBot) Stop() {
 	if s.cancel != nil {
 		s.cancel()

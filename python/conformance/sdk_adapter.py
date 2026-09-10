@@ -58,6 +58,19 @@ class SDKBot:
             # assertions untestable.
             self._record(error)
 
+    async def start_again(self) -> BaseException | None:
+        """Await run() directly instead of spawning a second task.
+
+        A bot that is already running raises before it awaits anything, which is
+        the answer this asks for; one that is not would block, so this is only
+        ever called after start() has taken hold.
+        """
+        try:
+            await self._bot.run()
+        except Exception as error:  # noqa: BLE001
+            return error
+        return None
+
     async def stop(self) -> None:
         if self._task is not None:
             self._task.cancel()

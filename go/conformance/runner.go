@@ -49,12 +49,30 @@ func RunCase(c Case, factory Factory) []Failure {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	bot.Start(ctx)
-	waitForCompletion(bot, fake, timeout)
-	cancel()
-	bot.Stop()
+
+	secondStartRejected := false
+	if c.Bot.StartTwice {
+		// Give the first Run a moment to take the loop, so the second call is
+		// answering "already running" rather than winning a race.
+		time.Sleep(50 * time.Millisecond)
+		secondStartRejected = bot.StartAgain() != nil
+	}
+
+	stopDuration := time.Duration(-1)
+	if c.Run.StopAfterMs > 0 {
+		time.Sleep(time.Duration(c.Run.StopAfterMs) * time.Millisecond)
+		startedStopping := time.Now()
+		cancel()
+		bot.Stop()
+		stopDuration = time.Since(startedStopping)
+	} else {
+		waitForCompletion(bot, fake, timeout)
+		cancel()
+		bot.Stop()
+	}
 
 	failures := checkRequests(c, fake)
-	failures = append(failures, checkAssertions(c, bot)...)
+	failures = append(failures, checkAssertions(c, bot, secondStartRejected, stopDuration)...)
 	return failures
 }
 
@@ -183,8 +201,32 @@ func checkRequests(c Case, fake *FakeServer) []Failure {
 	return failures
 }
 
-func checkAssertions(c Case, bot BotUnderTest) []Failure {
+func checkAssertions(c Case, bot BotUnderTest, secondStartRejected bool, stopDuration time.Duration) []Failure {
 	var failures []Failure
+
+	if want := c.Assert.SecondStartRejected; want != nil && *want != secondStartRejected {
+		detail := "the second Start was rejected, but this case expected it to be allowed"
+		if *want {
+			detail = "the second Start succeeded; the SDK now has two polls on one bot"
+		}
+		failures = append(failures, Failure{Where: "assert.secondStartRejected", Detail: detail})
+	}
+
+	if want := c.Assert.StoppedWithinMs; want != nil {
+		switch {
+		case stopDuration < 0:
+			failures = append(failures, Failure{
+				Where:  "assert.stoppedWithinMs",
+				Detail: "this case asserts on Stop but never called it; add run.stopAfterMs",
+			})
+		case stopDuration > time.Duration(*want)*time.Millisecond:
+			failures = append(failures, Failure{
+				Where: "assert.stoppedWithinMs",
+				Detail: fmt.Sprintf("Stop took %dms, over the %dms budget — it is waiting out the "+
+					"server's response instead of cancelling the request", stopDuration.Milliseconds(), *want),
+			})
+		}
+	}
 
 	if want := c.Assert.BotStopped; want != nil && *want != bot.StoppedItself() {
 		detail := "expected the bot to keep running, but it stopped on its own"
