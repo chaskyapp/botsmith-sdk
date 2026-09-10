@@ -32,6 +32,7 @@ correctly.
 """
 
 from .client import CommandParams, AdminClient, PageParams
+from .facade import CreateBotParams, CreateBotResult
 from .errors import AdminCode, AdminError, AdminTransportError, PlatformSecret, as_platform_secret
 from .types import (
     BotView,
@@ -51,6 +52,8 @@ __all__ = [
     "Capability",
     "CommandKind",
     "CommandParams",
+    "CreateBotParams",
+    "CreateBotResult",
     "CommandResult",
     "DialogueEvent",
     "Draft",

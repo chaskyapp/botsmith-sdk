@@ -135,6 +135,15 @@ class AdminClient:
             recovery_required=data.get("recoveryRequired", False),
         )
 
+    async def create_bot(self, params: "CreateBotParams") -> "CreateBotResult":
+        """Create a bot in one call, driving the four-step dialogue.
+
+        See facade.py for what this can and cannot hide.
+        """
+        from .facade import create_bot as _create_bot
+
+        return await _create_bot(self, params)
+
     async def grant(self, target_id: str, *, enabled: bool, expected_revision: int,
                     operation_id: str | None = None) -> GrantView:
         body = {

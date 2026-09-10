@@ -165,6 +165,13 @@ def _check_management_assertions(case: dict[str, Any], client: ManagementUnderTe
         codes = [error.management_code or error.message for error in client.errors]
         failures.append(Failure("assert.errorsReported", f"expected no errors, got {codes}"))
 
+    created = want.get("createdBotId")
+    if created:
+        if not any(getattr(result, "bot_id", None) == created for result in client.results):
+            failures.append(
+                Failure("assert.createdBotId", f"expected the facade to report creating {created}")
+            )
+
     secret = want.get("secretReturnedOnce")
     if secret:
         if secret not in encode(client.results):

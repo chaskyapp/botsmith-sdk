@@ -84,6 +84,12 @@ class SDKManagement:
                     operation_id=args.get("operationID"),
                 )
             )
+        if method == "createBot":
+            from chasky_botsmith_admin import CreateBotParams
+
+            return await self._client.create_bot(
+                CreateBotParams(name=str(args["name"]), username=str(args["username"]))
+            )
         if method == "grant":
             return await self._client.grant(
                 str(args["targetId"]),

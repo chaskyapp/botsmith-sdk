@@ -91,6 +91,11 @@ func (m *sdkManagement) call(ctx context.Context, method string, args map[string
 			params.ExpectedCredentialVersion = &version
 		}
 		return m.client.Command(ctx, params)
+	case "createBot":
+		return m.client.CreateBot(ctx, admin.CreateBotParams{
+			Name:     str(args["name"]),
+			Username: str(args["username"]),
+		})
 	case "grant":
 		return m.client.Grant(ctx, str(args["targetId"]), admin.GrantParams{
 			Enabled:          args["enabled"] == true,
@@ -180,6 +185,22 @@ func checkManagementAssertions(c Case, client ManagementUnderTest) []Failure {
 			Where:  "assert.errorsReported",
 			Detail: "expected no errors, got " + strings.Join(codes, ", "),
 		})
+	}
+
+	if want := c.Assert.CreatedBotID; want != "" {
+		found := false
+		for _, result := range client.Results() {
+			if created, ok := result.(admin.CreateBotResult); ok && created.BotID == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			failures = append(failures, Failure{
+				Where:  "assert.createdBotId",
+				Detail: fmt.Sprintf("expected the facade to report creating %s", want),
+			})
+		}
 	}
 
 	if secret := c.Assert.SecretReturnedOnce; secret != "" {

@@ -50,6 +50,8 @@ type Assertions struct {
 		UpdateID int64 `json:"updateId"`
 		Times    int   `json:"times"`
 	} `json:"handlerRuns"`
+	// Management: the id of the bot a facade call reports having created.
+	CreatedBotID string `json:"createdBotId"`
 	// Management: the revealed token must come back from the call itself and
 	// appear in none of the listed places.
 	SecretReturnedOnce string   `json:"secretReturnedOnce"`
