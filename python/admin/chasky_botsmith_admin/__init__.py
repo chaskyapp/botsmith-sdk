@@ -32,7 +32,7 @@ correctly.
 """
 
 from .client import CommandParams, AdminClient, PageParams
-from .errors import AdminCode, AdminError, AdminTransportError
+from .errors import AdminCode, AdminError, AdminTransportError, PlatformSecret, as_platform_secret
 from .types import (
     BotView,
     Capability,
@@ -59,6 +59,8 @@ __all__ = [
     "AdminCode",
     "AdminError",
     "AdminTransportError",
+    "PlatformSecret",
+    "as_platform_secret",
     "OperationReceipt",
     "Page",
     "PageParams",

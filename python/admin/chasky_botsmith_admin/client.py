@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 import httpx
 
-from .errors import AdminError, AdminTransportError, code_for
+from .errors import AdminError, AdminTransportError, PlatformSecret, code_for
 from .types import (
     BotView,
     Capability,
@@ -47,7 +47,7 @@ class AdminClient:
         self,
         *,
         base_url: str,
-        api_secret: str,
+        api_secret: PlatformSecret,
         bearer_token: str | None = None,
         http: httpx.AsyncClient | None = None,
         new_operation_id: Callable[[], str] | None = None,

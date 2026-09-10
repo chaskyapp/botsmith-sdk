@@ -50,7 +50,7 @@ type sdkManagement struct {
 func NewSDKManagement(baseURL string) ManagementUnderTest {
 	client, err := admin.New(admin.Options{
 		BaseURL:     baseURL,
-		APISecret:   testAPISecret,
+		APISecret:   admin.AsPlatformSecret(testAPISecret),
 		BearerToken: testBearer,
 	})
 	if err != nil {

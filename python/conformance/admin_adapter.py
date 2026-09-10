@@ -7,7 +7,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from chasky_botsmith_admin import CommandParams, AdminClient, AdminError, PageParams
+from chasky_botsmith_admin import as_platform_secret, CommandParams, AdminClient, AdminError, PageParams
 
 TEST_API_SECRET = "test-api-secret"
 TEST_BEARER = "test-session-bearer"
@@ -45,7 +45,7 @@ class SDKManagement:
         self.warnings: list[str] = []
         self._client = AdminClient(
             base_url=base_url,
-            api_secret=TEST_API_SECRET,
+            api_secret=as_platform_secret(TEST_API_SECRET),
             bearer_token=TEST_BEARER,
         )
 

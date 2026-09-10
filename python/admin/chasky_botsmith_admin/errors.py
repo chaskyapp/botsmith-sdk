@@ -2,7 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, NewType
+
+#: The platform's own API secret, deliberately not a plain ``str``.
+#:
+#: A leaked bot token lets someone post as that one bot: bad, bounded, closed by
+#: rotating it. This opens every non-public route on the API. They are not the
+#: same incident, and a distinct type keeps them from being passed to the same
+#: places — a type checker rejects a bare string, and ``as_platform_secret(...)``
+#: reads wrong wherever it does not belong.
+PlatformSecret = NewType("PlatformSecret", str)
+
+
+def as_platform_secret(value: str) -> PlatformSecret:
+    """Acknowledge a value as the platform secret."""
+    if not value:
+        raise ValueError("the platform secret must not be empty")
+    return PlatformSecret(value)
 
 AdminCode = Literal[
     "INVALID_INPUT",

@@ -1,4 +1,5 @@
 import { AdminError, AdminTransportError, codeFor } from "./errors.js";
+import { assertServerOnly, type PlatformSecret } from "./guard.js";
 import type {
   BotView,
   Capability,
@@ -13,8 +14,14 @@ export interface AdminClientOptions {
   baseUrl: string;
   /** A human session bearer token. Mutually exclusive with cookie auth. */
   bearerToken?: string | undefined;
-  /** The platform API secret, sent as X-Secret. NEVER expose it to a browser. */
-  apiSecret: string;
+  /**
+   * The platform API secret, sent as X-Secret.
+   *
+   * Typed as PlatformSecret rather than string so that passing it takes an
+   * explicit `asPlatformSecret(...)` — a line that reads wrong wherever it does
+   * not belong.
+   */
+  apiSecret: PlatformSecret;
   fetch?: typeof globalThis.fetch | undefined;
   /** Supplies operationID values; override in tests for determinism. */
   newOperationId?: (() => string) | undefined;
@@ -51,6 +58,8 @@ export class AdminClient {
   private readonly newOperationId: () => string;
 
   constructor(options: AdminClientOptions) {
+    // Before anything else: this must not be running in a browser.
+    assertServerOnly();
     if (!options.apiSecret) throw new Error("an API secret is required");
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.bearerToken = options.bearerToken;

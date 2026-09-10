@@ -2,8 +2,16 @@
   "name": "@chasky/botsmith-admin",
   "version": "0.0.0",
   "private": true,
-  "description": "BotSmith administration client. Requires the Chasky platform secret — NOT for bot authors.",
+  "description": "BotSmith administration client. Requires the Chasky platform secret \u2014 NOT for bot authors.",
   "type": "module",
-  "engines": { "node": ">=20" },
-  "exports": { ".": "./dist/index.js" }
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "browser": null,
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false
 }

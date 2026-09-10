@@ -14,6 +14,16 @@ import (
 	"time"
 )
 
+// PlatformSecret is the platform's own API secret, deliberately not a string.
+//
+// A leaked bot token lets someone post as that one bot: bad, bounded, closed by
+// rotating it. This opens every non-public route on the API. They are not the
+// same incident, and the type keeps them from being passed to the same places.
+type PlatformSecret string
+
+// AsPlatformSecret acknowledges a value as the platform secret.
+func AsPlatformSecret(value string) PlatformSecret { return PlatformSecret(value) }
+
 type Options struct {
 	BaseURL string
 	// BearerToken is a human session token. The server accepts a bearer OR a
@@ -23,7 +33,12 @@ type Options struct {
 	BearerToken string
 	// APISecret goes in X-Secret. It is a PLATFORM secret and must never reach
 	// a browser or a bot process.
-	APISecret  string
+	//
+	// Its own named type is the point: Go will not accept a bare string here, so
+	// passing it takes an explicit AsPlatformSecret(...) — a line that reads
+	// wrong wherever it does not belong. Go has no browser to guard against, so
+	// this is the layer that does the work.
+	APISecret  PlatformSecret
 	HTTPClient *http.Client
 	// NewOperationID supplies operation ids; override for deterministic tests.
 	NewOperationID func() string
@@ -32,7 +47,7 @@ type Options struct {
 type Client struct {
 	baseURL        string
 	bearerToken    string
-	apiSecret      string
+	apiSecret      PlatformSecret
 	http           *http.Client
 	newOperationID func() string
 }
@@ -174,7 +189,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any, page Pag
 	if err != nil {
 		return &TransportError{Method: label, cause: err}
 	}
-	req.Header.Set("X-Secret", c.apiSecret)
+	req.Header.Set("X-Secret", string(c.apiSecret))
 	if c.bearerToken != "" {
 		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
 	}
