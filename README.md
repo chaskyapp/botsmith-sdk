@@ -61,8 +61,9 @@ case is not a tested runner.
 - **[docs/01-organization.md](docs/01-organization.md)** — how that contract
   survives three implementations without drifting: layout, what is invariant and
   what is idiomatic, conformance suite, versioning, work order.
-- **[conformance/](conformance/)** — the suite that turns the guarantees into
-  failing tests. It gets written **before** any SDK.
+- **[conformance/](conformance/)** — 19 shared cases that turn the guarantees
+  into failing tests. They get written **before** any SDK, and every guarantee in
+  the contract has at least one.
 
 ## Smoke tests
 

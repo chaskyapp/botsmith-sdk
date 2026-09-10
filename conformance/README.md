@@ -77,18 +77,30 @@ Python runners too:
 - **Group repeated failures.** Five identical "unexpected request" lines are
   noise; a count with the first few is information.
 
-## Known gaps
+## Coverage of the guarantees
 
-Declared rather than left to be noticed later:
+Every guarantee in §8 of the contract now has at least one case, and so does
+every management requirement. The two that were open longest are worth naming,
+because closing them is what the format grew for:
 
-- **G1 (one in-flight poll per instance)** — calling `start()` twice is a local
-  error that makes no HTTP request, so it is a per-SDK unit test, not a case here.
-- **G8 (clean cancellation)** — needs the runner to call `stop()` mid-flight,
-  which the format does not express yet. Covering it means adding a
-  `run.stopAfterMs` field to [`SCHEMA.md`](SCHEMA.md); left out until the first
-  runner exists, so the format grows against a real need instead of a guess.
-- **The management surface** has no cases yet. It ships after the runtime, and
-  its cases come with it.
+- **G1** makes no HTTP request at all — a second `start()` must fail locally.
+  The case says `bot.startTwice`, and the runner reports whether the second call
+  was rejected.
+- **G8** needed the runner to interrupt the bot rather than watch it. The case
+  says `run.stopAfterMs`, and the fake holds its response for five seconds so
+  that a `stop()` which waits it out is unmistakable.
+
+Both were listed as known gaps for most of this suite's life, on the grounds
+that the format could not express them. It could not — until a case needed it,
+which is the right moment to grow a format rather than the moment someone
+imagines the need.
+
+## Still not covered
+
+- **The management smokes have never met a real server.** Conformance proves
+  them against a fake that answers what the six `m*` cases declare; only a live
+  run proves those cases describe the real thing. That is the gap that found
+  `chat.id` carrying `bot:` twice on the runtime side, and it is still open here.
 
 ## A note on what these cases assume
 
