@@ -38,12 +38,12 @@ Shipping both in one artifact would have put a surface its own audience cannot
 use inside the package they install.
 
 **This split is a consequence of the credential, not a permanent shape.**
-[`docs/02-developer-keys.md`](docs/02-developer-keys.md) proposes moving
-`/bot-management` off the global `X-Secret` and onto a per-developer
-`x-chasky-dev-secret: sk_…`, scoped to the bots its owner owns. When that ships,
-managing your own bots becomes an ordinary third-party capability and this split
-reopens **on purpose** — the admin client would become a normal public package,
-or fold back into `@chasky/botsmith` as a subpath, which is where D13 started.
+[`docs/02-developer-api.md`](docs/02-developer-api.md) proposes a new
+`/developer/…` surface with a per-developer `x-chasky-dev-secret: sk_…`, shaped
+for code rather than for a conversation — creating a bot becomes one call
+instead of four chained ones. When that ships, a third party can manage their
+own bots with an ordinary public package, and it is worth asking whether the
+admin client still has a caller at all.
 
 All three pass the same eleven cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
