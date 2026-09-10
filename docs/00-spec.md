@@ -918,20 +918,21 @@ These come out of this analysis and are `backend-api-go` tickets, not SDK work.
   before losing messages; that number is not published today.
 - **S5 — `Retry-After` on BotSmith's `429`.** Minor. Without the header, a
   `TOO_MANY_ATTEMPTS` client can only guess the backoff.
-- **S6 — Developer keys for programmatic bot management.** *Not a papercut like
-  S2–S5: it decides whether third parties can manage their own bots at all.*
+- **S6 — `/bot-management` authenticates with `x-chasky-dev-secret`, not
+  `X-Secret`.** *Not a papercut like S2–S5: it decides whether third parties can
+  manage their own bots at all.*
 
-  **BotSmith is not what changes.** Its dialogue is a person in the portal,
-  authenticated by their session plus the platform secret, and that is right for
-  a first-party UI talking to its own backend. What is missing is the other
-  thing: a developer managing their own bots **from code**, which today is
-  impossible at any price, because the only credential that opens the surface is
-  the one that opens every non-public route on the API.
+  BotSmith's **dialogue** does not change — the commands, the steps, the CAS on
+  `expectedRevision` all stay. What changes is the credential at the door: today
+  it is Chasky's global API secret, the one that guards every non-public route,
+  so handing it to a developer would hand them the entire API. That is why no
+  third party can manage their own bots at any price.
 
-  An `sk_`-prefixed key — generated from a panel, hashed at rest, revealed once,
-  authenticated separately from `ValidateApiSecret`, and **scoped to the bots its
-  owner owns** — adds that surface without touching this one. Full proposal in
-  [`02-developer-keys.md`](02-developer-keys.md).
+  A per-developer `sk_` key — hashed at rest, revealed once, checked by its own
+  middleware **instead of** `ValidateApiSecret`, and **scoped to the bots its
+  owner owns** — fixes that, and also makes a leak attributable and rotation
+  partial. Full proposal in [`02-developer-keys.md`](02-developer-keys.md),
+  including what it would do to the package split.
 
 ---
 

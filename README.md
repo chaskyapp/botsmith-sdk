@@ -37,12 +37,13 @@ rotating it. A leaked platform secret opens every non-public route on the API.
 Shipping both in one artifact would have put a surface its own audience cannot
 use inside the package they install.
 
-The admin package serves the portal's BFF with the portal's credential, and
-stays that way. What is missing is a third thing:
-[`docs/02-developer-keys.md`](docs/02-developer-keys.md) proposes per-developer
-`sk_` keys, scoped to the bots their owner owns, so a developer could manage
-their own bots **from code** — today impossible at any price. That would add a
-fourth artifact for third parties; it would not merge these two.
+**This split is a consequence of the credential, not a permanent shape.**
+[`docs/02-developer-keys.md`](docs/02-developer-keys.md) proposes moving
+`/bot-management` off the global `X-Secret` and onto a per-developer
+`x-chasky-dev-secret: sk_…`, scoped to the bots its owner owns. When that ships,
+managing your own bots becomes an ordinary third-party capability and this split
+reopens **on purpose** — the admin client would become a normal public package,
+or fold back into `@chasky/botsmith` as a subpath, which is where D13 started.
 
 All three pass the same eleven cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
