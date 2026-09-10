@@ -50,7 +50,7 @@ class FakeServer:
             def log_message(self, *_args: Any) -> None:
                 """Silence: the runner's own output is the report."""
 
-            def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler's contract
+            def _handle(self) -> None:
                 length = int(self.headers.get("Content-Length") or 0)
                 raw = self.rfile.read(length) if length else b""
                 try:
@@ -100,6 +100,20 @@ class FakeServer:
                     return
 
                 self._respond(respond.get("status", 200), respond.get("body"))
+
+            # BaseHTTPRequestHandler dispatches by method name and answers 501 for
+            # anything it has no do_* for. With only do_POST defined, every GET
+            # in a case came back "Not Implemented" — and nothing caught it for
+            # fifteen cases, because the whole runtime suite is POST-only. The
+            # first case to read the dialogue found it.
+            #
+            # The other two fakes take a single handler for every method, so
+            # this asymmetry was Python's alone.
+            do_POST = _handle  # noqa: N815 - BaseHTTPRequestHandler's contract
+            do_GET = _handle  # noqa: N815
+            do_PUT = _handle  # noqa: N815
+            do_PATCH = _handle  # noqa: N815
+            do_DELETE = _handle  # noqa: N815
 
             def _respond(self, status: int, payload: Any) -> None:
                 encoded = json.dumps(payload).encode()

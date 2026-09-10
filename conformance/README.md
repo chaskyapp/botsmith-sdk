@@ -67,6 +67,12 @@ Python runners too:
 - **Answer unexpected requests, do not hang on them.** When the SDK sends
   something past the last exchange, record it *and* reply. Leaving it to time out
   makes the case fail on a timeout, which hides *which* request was the extra one.
+- **Answer every method, not just the ones in use.** Python's fake was built on
+  `BaseHTTPRequestHandler`, which dispatches by method name and answers 501 for
+  anything without a `do_*`. Only `do_POST` existed, so every `GET` in a case
+  came back "Not Implemented" — and nothing noticed for fifteen cases, because
+  the entire runtime suite is POST-only. The first case that read the dialogue
+  found it.
 - **Redact before printing.** The runner prints paths, and paths carry the token.
 - **Group repeated failures.** Five identical "unexpected request" lines are
   noise; a count with the first few is information.
