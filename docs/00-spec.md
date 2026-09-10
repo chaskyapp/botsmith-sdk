@@ -135,8 +135,11 @@ POST <base>/bot-management/commands
 PUT  <base>/bot-management/administrators/{id}
 ```
 
-Credentials: **human session (bearer or cookie) + `X-Secret`**. Nothing to do
-with the bot token. Different envelope: `{ok, data}` on success and
+Credentials: **exactly one of a developer key (`sk_…`, in `X-Chasky-Dev-Secret`)
+or a human session (bearer or cookie)** — never both: the server answers 401 to a
+request carrying two rather than choosing. No `X-Secret` since the developer-key
+delta, which made the group public at the routing layer with its own guard.
+Nothing to do with the bot token. Different envelope: `{ok, data}` on success and
 `{ok:false, error:{code}}` on failure, served `no-store`.
 
 Codes: `INVALID_INPUT` 400, `UNAUTHORIZED` 401, `FORBIDDEN` 403, `NOT_FOUND` 404,
@@ -397,7 +400,8 @@ the path. Surface: `getMe`, `getUpdates`, `sendMessage`, `sendChatAction`, plus
 all the scaffolding in §7.
 
 **`/management` subpath — management (later, and only on demand).** Credential:
-**human session + `X-Secret`**. Surface: the six `/bot-management` endpoints.
+**a developer key or a human session, exactly one**. Surface: the
+`/bot-management` endpoints.
 
 Two advantages over publishing separate packages: the product's name **is** the
 package's name, and the three ecosystems come out symmetric. In Go, a module with
@@ -412,9 +416,9 @@ against the server:
 
 | | Runtime | Management |
 |---|---|---|
-| Credential | token in the **path** | human session **+** `X-Secret` |
+| Credential | token in the **path** | developer key **or** human session, exactly one |
 | Route | `/bot<TOKEN>/sendMessage` | `/bot-management/commands` |
-| Server auth | `IsPublic: true, NoRequiresAuthentication: true` | session middleware + API secret |
+| Server auth | `IsPublic: true, NoRequiresAuthentication: true` + `ResolveBotToken` | `IsPublic: true, NoRequiresAuthentication: true` + `ResolveDeveloperKey` |
 | Success envelope | `{ok, result}` | `{ok, data}` |
 | Error envelope | `{ok:false, error_code, description}` | `{ok:false, error:{code}}` |
 | Error code type | **number** (`409`) | **string** (`"STALE_STATE"`) |
@@ -425,15 +429,16 @@ From that come **four implementation requirements**, not suggestions. They are
 what keeps a shared artifact from reintroducing the problems separation avoided:
 
 **R-A. Separate constructors — never one that accepts both credentials.**
-`createBot({ token })` and `createManagementClient({ session, apiSecret })`.
-Never a single constructor taking token *or* session+secret: that was the real
-risk, and it survives intact inside one package if allowed. With two
-constructors, sending the `X-Secret` from the bot process is something you have
-to write on purpose again.
+`createBot({ token })` and `new AdminClient({ developerKey })` (or
+`{ bearerToken }`). Never a single constructor taking a bot token *or* an
+administration credential: that was the real risk, and it survives intact inside
+one package if allowed. With two constructors, sending an administration
+credential from the bot process is something you have to write on purpose again.
 
 It matters because the damage is asymmetric: a leaked **token** lets an attacker
-send messages as that bot — bad, bounded, closed by rotating; the **`X-Secret`**
-is a *platform* secret, and that is not the same incident.
+send messages as that bot — bad, bounded, closed by rotating; a leaked
+**developer key** administers every bot its owner has — creates them, rotates
+their tokens, points their webhooks elsewhere — and that is not the same incident.
 
 **R-B. Distinct error types per surface.** `ChaskyApiError` (runtime, numeric
 `code`) and `ManagementError` (management, string `code`). They share no base

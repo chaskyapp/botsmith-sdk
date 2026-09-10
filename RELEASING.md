@@ -45,7 +45,7 @@ be published even by accident. `files` ships `dist` and the README only —
 
 Then the same for `js/admin`, whose `exports` maps the `browser` condition to
 `null`. **Do not remove that**: it is what makes a bundler refuse to resolve the
-package for a client build, and it is the only guard on the platform secret that
+package for a client build, and it is the only guard on the developer key that
 fails before the code ships.
 
 ## Go

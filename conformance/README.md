@@ -106,27 +106,26 @@ imagines the need.
   should grow.
 
 
-**The management smokes have never met a real server, and are blocked on S6
-rather than merely pending.**
+**The management smokes have never met a real server.** S6 has shipped on the
+server side, so running them is now the closing step of that delta (DK-T8).
 
 Conformance proves them against a fake that answers what the six `m*` cases
 declare; only a live run proves those cases describe the real thing. That is the
 gap that found `chat.id` carrying `bot:` twice on the runtime side, and it is
 still open here.
 
-Running them today is possible — the server takes a session plus `X-Secret`, and
-whoever owns the instance has both — but deliberately deferred:
+They were deferred while the only way in was a session plus `X-Secret`: that
+would have exercised a credential S6 replaces, and required the platform secret
+in a `.env`. With developer keys they need one credential, `CHASKY_DEV_KEY`,
+issued from BotSmith.
 
-- It would exercise a credential that S6 replaces, so the auth half of what it
-  verifies expires on arrival.
-- It requires writing the **platform secret** into a `.env`. This repo just grew
-  three guards to keep that value out of places it does not belong; asking for it
-  in a file, for a check that will be repeated once the developer key exists, is
-  the wrong trade.
-
-When S6 ships, the smokes need one change each: the header name and the
-environment variable. The calls, the shapes they print and the read-only default
-all stay.
+**The change was larger than "one line each", which this file used to promise.**
+The clients sent `X-Secret` *and* a bearer. With a key, sending the bearer too is
+a 401 — the server rejects two credentials rather than choosing — so swapping the
+header alone would have broken every call. Each client now takes exactly one
+credential and refuses both at construction, and case `m1` asserts
+`Authorization: $absent` next to the key. The calls, the shapes the smokes print
+and the read-only default stayed.
 
 ## A note on what these cases assume
 

@@ -13,27 +13,29 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — 15/15 conformance |
-| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 15/15 conformance |
-| 3 | Python | `chasky-botsmith` | [`python/`](python/) — 15/15 conformance |
+| 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — 19/19 conformance |
+| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 19/19 conformance |
+| 3 | Python | `chasky-botsmith` | [`python/`](python/) — 19/19 conformance |
 
 ## Administration is a separate package, on purpose
 
-The BotSmith admin surface (`/bot-management`) sits behind Chasky's **global API
-secret gate**, so calling it needs `X-Secret` — the platform's own secret, which
-no third party has or should have. The runtime's routes are marked public
-precisely so that a bot token is the only credential an external author needs.
+The BotSmith admin surface (`/bot-management`) takes a credential that
+**administers** bots — a developer key (`sk_…`) or a human session, exactly one.
+Whoever holds it can create bots, rotate their tokens and point their webhooks
+elsewhere. A bot author needs none of that: a bot token is the only credential
+the runtime asks for.
 
 So the admin client is not part of the SDK a bot author installs:
 
-| | Bot author installs | Chasky's own BFF installs |
+| | Bot author installs | Whoever administers bots installs |
 |---|---|---|
 | npm | `@chasky/botsmith` | `@chasky/botsmith-admin` |
 | Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/admin` |
 | PyPI | `chasky-botsmith` | `chasky-botsmith-admin` |
 
 A leaked bot token lets someone post as that one bot: bad, bounded, closed by
-rotating it. A leaked platform secret opens every non-public route on the API.
+rotating it. A leaked developer key administers every bot its owner has —
+recoverable by revoking it, but not the same incident.
 Shipping both in one artifact would have put a surface its own audience cannot
 use inside the package they install.
 
@@ -80,9 +82,9 @@ cp .env.example .env    # then fill in the token, never export it on a command l
 | Python | `cd python && .venv/bin/python smoke.py` · `smoke_admin.py` |
 
 The runtime smokes stand in for a **third-party bot author**: they use only what
-such an author has, a bot token. The admin smokes stand in for **Chasky's own
-BFF** — they authenticate with the platform secret, so they are not a
-third-party scenario at all.
+such an author has, a bot token. The admin smokes stand in for **a developer
+administering their own bots from their own code** — they authenticate with a
+developer key (`CHASKY_DEV_KEY`), which is exactly what such a developer has.
 
 The admin smokes are **read-only by default**. Their commands create bots, rotate
 credentials and reveal tokens against real data, so writes sit behind an explicit
