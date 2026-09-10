@@ -37,11 +37,12 @@ rotating it. A leaked platform secret opens every non-public route on the API.
 Shipping both in one artifact would have put a surface its own audience cannot
 use inside the package they install.
 
-**This split is a consequence of how the server authenticates today, not a
-permanent shape.** [`docs/02-developer-keys.md`](docs/02-developer-keys.md)
-proposes per-developer `sk_` keys — generated from a panel, scoped to the bots
-their owner owns — which would make administering your own bots an ordinary
-third-party capability and let the two packages merge again.
+The admin package serves the portal's BFF with the portal's credential, and
+stays that way. What is missing is a third thing:
+[`docs/02-developer-keys.md`](docs/02-developer-keys.md) proposes per-developer
+`sk_` keys, scoped to the bots their owner owns, so a developer could manage
+their own bots **from code** — today impossible at any price. That would add a
+fourth artifact for third parties; it would not merge these two.
 
 All three pass the same eleven cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
