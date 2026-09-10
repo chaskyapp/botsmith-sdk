@@ -62,6 +62,10 @@ export interface Assertions {
     notContains?: string;
   }[];
   warnings?: { contains: string }[];
+  /** The second start() failed locally, without a request (G1). */
+  secondStartRejected?: boolean;
+  /** stop() returned within this many milliseconds (G8). */
+  stoppedWithinMs?: number;
 }
 
 export interface ConformanceCase {
@@ -77,10 +81,16 @@ export interface ConformanceCase {
     transport: "polling";
     options?: { limit?: number; timeoutSeconds?: number };
     handler: HandlerSpec;
+    /** Call start() a second time after the first succeeds (G1). */
+    startTwice?: boolean;
   };
   exchanges: Exchange[];
   assert?: Assertions;
-  run?: { timeoutMs?: number };
+  run?: {
+    timeoutMs?: number;
+    /** Wait this long, then stop() and measure. Replaces the normal wait (G8). */
+    stopAfterMs?: number;
+  };
 }
 
 /** A request as the fake actually saw it. */

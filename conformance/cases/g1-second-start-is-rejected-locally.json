@@ -1,0 +1,28 @@
+{
+  "id": "g1-second-start-is-rejected-locally",
+  "contractVersion": "1.0",
+  "guarantee": "G1",
+  "title": "Starting an already-running bot fails locally, without a second poll",
+  "why": "Two overlapping polls on one bot used to split the updates in silence — each path got half, with no error anywhere. The server now answers 409, but an SDK that starts a second loop is causing that eviction rather than reporting it, and the two would fight. The failure must be local and immediate: no request, no second loop, an error the caller gets before anything reaches the network.",
+
+  "bot": {
+    "transport": "polling",
+    "options": { "limit": 50, "timeoutSeconds": 25 },
+    "handler": { "kind": "noop" },
+    "startTwice": true
+  },
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [] } },
+      "repeat": true
+    }
+  ],
+
+  "assert": {
+    "secondStartRejected": true,
+    "botStopped": false
+  },
+  "run": { "timeoutMs": 3000 }
+}

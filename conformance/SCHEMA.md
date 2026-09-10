@@ -116,6 +116,19 @@ function. The vocabulary is deliberately tiny; grow it only when a case needs it
 | `throwOnUpdateIds` | update ids on which the handler raises |
 | `replyText` | text to send; defaults to echoing the received text |
 
+## Driving the bot itself
+
+Two guarantees are about the bot's own lifecycle rather than about what it sends,
+so a case can ask the runner to do something to it:
+
+| Field | Meaning |
+|---|---|
+| `bot.startTwice` | call `start()` a second time after the first succeeds (G1) |
+| `run.stopAfterMs` | wait this long, then `stop()` and measure how long it took (G8) |
+
+`stopAfterMs` replaces the normal wait: the case ends when `stop()` returns, not
+when the exchanges run out.
+
 ## `assert`
 
 Everything that is not an observed request.
@@ -126,6 +139,8 @@ Everything that is not an observed request.
 | `handlerRuns` | `[{ "updateId": N, "times": M }]` — exact run counts |
 | `errorsReported` | `[{ "code": N, "notContains": "..." }]` — errors surfaced to the author |
 | `warnings` | `[{ "contains": "..." }]` — warnings emitted (G6, D8) |
+| `secondStartRejected` | the second `start()` failed locally, without a request (G1) |
+| `stoppedWithinMs` | `stop()` returned within this many milliseconds (G8) |
 
 `notContains` is how G5 is pinned: the case asserts the token string never
 appears in anything the SDK hands back.

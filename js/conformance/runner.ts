@@ -46,6 +46,9 @@ export async function runCase(
   // bug is the whole point. An unhandled rejection from the bot under test must
   // fail THIS case and let the suite continue — otherwise one broken SDK hides
   // every case after it, which is exactly when the report matters most.
+  let secondStartRejected = false;
+  let stopDurationMs: number | undefined;
+  let stopped = false;
   const crashes: string[] = [];
   const onCrash = (reason: unknown) => crashes.push(describe(reason));
   process.on("unhandledRejection", onCrash);
@@ -60,12 +63,33 @@ export async function runCase(
       handler: testCase.bot?.handler ?? { kind: "noop" },
     });
     await bot.start();
-    await waitForCompletion(bot, server, testCase.run?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+
+    if (testCase.bot?.startTwice) {
+      // G1: the second start must fail locally. If it silently succeeds, the
+      // SDK has two loops on one bot and is causing the very 409 it should be
+      // reporting.
+      try {
+        await bot.start();
+      } catch {
+        secondStartRejected = true;
+      }
+    }
+
+    const stopAfterMs = testCase.run?.stopAfterMs;
+    if (stopAfterMs !== undefined) {
+      await sleep(stopAfterMs);
+      const startedStopping = Date.now();
+      await bot.stop();
+      stopDurationMs = Date.now() - startedStopping;
+      stopped = true;
+    } else {
+      await waitForCompletion(bot, server, testCase.run?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    }
   } catch (error) {
     failures.push(failure("run", `the bot threw out of start(): ${describe(error)}`));
   } finally {
     try {
-      await bot?.stop();
+      if (!stopped) await bot?.stop();
     } catch {
       /* stopping must never mask a real failure */
     }
@@ -78,7 +102,7 @@ export async function runCase(
     failures.push(failure("crash", `the bot threw and did not handle it: ${crash}`));
   }
   failures.push(...checkRequests(testCase, server));
-  if (bot) failures.push(...checkAssertions(testCase, bot));
+  if (bot) failures.push(...checkAssertions(testCase, bot, { secondStartRejected, stopDurationMs }));
   return { case: testCase, failures };
 }
 
@@ -275,10 +299,42 @@ function checkRequests(testCase: ConformanceCase, server: FakeServer): Failure[]
   return failures;
 }
 
-function checkAssertions(testCase: ConformanceCase, bot: BotUnderTest): Failure[] {
+interface Lifecycle {
+  secondStartRejected: boolean;
+  stopDurationMs: number | undefined;
+}
+
+function checkAssertions(testCase: ConformanceCase, bot: BotUnderTest, lifecycle: Lifecycle): Failure[] {
   const failures: Failure[] = [];
   const want = testCase.assert;
   if (!want) return failures;
+
+  if (want.secondStartRejected !== undefined && want.secondStartRejected !== lifecycle.secondStartRejected) {
+    failures.push(
+      failure(
+        "assert.secondStartRejected",
+        want.secondStartRejected
+          ? "the second start() succeeded; the SDK now has two polls on one bot"
+          : "the second start() was rejected, but this case expected it to be allowed",
+      ),
+    );
+  }
+
+  if (want.stoppedWithinMs !== undefined) {
+    if (lifecycle.stopDurationMs === undefined) {
+      failures.push(
+        failure("assert.stoppedWithinMs", "this case asserts on stop() but never called it; add run.stopAfterMs"),
+      );
+    } else if (lifecycle.stopDurationMs > want.stoppedWithinMs) {
+      failures.push(
+        failure(
+          "assert.stoppedWithinMs",
+          `stop() took ${lifecycle.stopDurationMs}ms, over the ${want.stoppedWithinMs}ms budget — ` +
+            `it is waiting out the server's response instead of aborting the request`,
+        ),
+      );
+    }
+  }
 
   if (want.botStopped !== undefined && want.botStopped !== bot.stoppedItself) {
     failures.push(

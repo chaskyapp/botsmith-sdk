@@ -1,0 +1,26 @@
+{
+  "id": "g8-stop-aborts-the-poll-in-flight",
+  "contractVersion": "1.0",
+  "guarantee": "G8",
+  "title": "stop() aborts the long poll instead of waiting out the server's deadline",
+  "why": "A long poll can hold the connection for the full timeout — up to 30 seconds by contract. An SDK that only sets a flag and waits for the request to come back makes every shutdown take that long: a deploy hangs, a Ctrl-C feels broken, and a supervisor that kills after 10s leaves the process no chance to stop cleanly. The server here holds the response for five seconds and stop() is called after two hundred milliseconds; returning promptly is the whole guarantee.",
+
+  "bot": {
+    "transport": "polling",
+    "options": { "limit": 50, "timeoutSeconds": 25 },
+    "handler": { "kind": "noop" }
+  },
+
+  "exchanges": [
+    {
+      "expect": { "method": "POST", "path": "/bot{token}/getUpdates", "body": { "offset": 0 } },
+      "respond": { "status": 200, "body": { "ok": true, "result": [] }, "delayMs": 5000 },
+      "repeat": true
+    }
+  ],
+
+  "assert": {
+    "stoppedWithinMs": 2000
+  },
+  "run": { "stopAfterMs": 200, "timeoutMs": 10000 }
+}

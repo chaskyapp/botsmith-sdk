@@ -52,6 +52,8 @@ class SdkBotUnderTest implements BotUnderTest {
   }
 
   start(): Promise<void> {
+    // Deliberately not caught: a second start() must reject, and the runner
+    // needs to see it reject (G1).
     return this.bot.start();
   }
 
