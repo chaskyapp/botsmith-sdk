@@ -46,6 +46,7 @@ from .types import (
     ChatAction,
     Update,
     User,
+    WebhookInfo,
 )
 
 __all__ = [
@@ -68,4 +69,5 @@ __all__ = [
     "Update",
     "UsageError",
     "User",
+    "WebhookInfo",
 ]

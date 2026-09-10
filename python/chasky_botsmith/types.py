@@ -23,6 +23,40 @@ ChatAction = Literal["typing"]
 
 
 @dataclass(frozen=True, slots=True)
+class WebhookInfo:
+    """What ``get_webhook_info`` reports.
+
+    An empty ``state`` means the bot has no destination registered and is still
+    polling; ``active`` and ``suspended`` are the webhook states.
+    ``has_secret_token`` answers "is one configured", never "which one" — the
+    server does not reveal it and neither does this.
+    """
+
+    url: str
+    has_secret_token: bool
+    pending_update_count: int
+    #: The LAST RUN of failures, not all time: a successful delivery clears
+    #: them. An error from three days ago beside a working webhook explains
+    #: nothing.
+    last_error_at: datetime | None = None
+    last_error_message: str | None = None
+    #: Empty while polling.
+    state: str | None = None
+
+
+def webhook_info_from_wire(raw: dict[str, Any]) -> WebhookInfo:
+    last_error = raw.get("last_error_date")
+    return WebhookInfo(
+        url=raw.get("url", ""),
+        has_secret_token=raw.get("has_secret_token", False),
+        pending_update_count=raw.get("pending_update_count", 0),
+        last_error_at=datetime.fromtimestamp(last_error, tz=timezone.utc) if last_error else None,
+        last_error_message=raw.get("last_error_message") or None,
+        state=raw.get("state") or None,
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class User:
     id: UserID
     name: str

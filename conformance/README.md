@@ -97,6 +97,15 @@ imagines the need.
 
 ## Still not covered
 
+- **`getWebhookInfo` has no case.** The format can invoke methods on the *admin*
+  client (`kind: "management"`, `calls`) but has no equivalent for the runtime's
+  raw client — the runtime adapter exposes a bot's lifecycle, not its methods.
+  Covering it means either a third case kind or widening `calls` to reach the raw
+  client. Left undone deliberately: the same rule that kept `run.stopAfterMs`
+  out until a case needed it. Now one does, so this is the next thing the format
+  should grow.
+
+
 **The management smokes have never met a real server, and are blocked on S6
 rather than merely pending.**
 

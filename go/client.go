@@ -143,6 +143,26 @@ func (c *Client) SendMessage(ctx context.Context, p SendMessageParams) (*Message
 	return raw.toMessage(), nil
 }
 
+// GetWebhookInfo reports the bot's webhook state. An empty State means it is
+// still polling.
+func (c *Client) GetWebhookInfo(ctx context.Context) (WebhookInfo, error) {
+	var raw wireWebhookInfo
+	if err := c.call(ctx, "getWebhookInfo", struct{}{}, nil, &raw); err != nil {
+		return WebhookInfo{}, err
+	}
+	info := WebhookInfo{
+		URL:                raw.URL,
+		HasSecretToken:     raw.HasSecretToken,
+		PendingUpdateCount: raw.PendingUpdateCount,
+		LastErrorMessage:   raw.LastErrorMessage,
+		State:              raw.State,
+	}
+	if raw.LastErrorDate > 0 {
+		info.LastErrorAt = time.Unix(raw.LastErrorDate, 0).UTC()
+	}
+	return info, nil
+}
+
 func (c *Client) SendChatAction(ctx context.Context, chatID ChatID, action ChatAction) error {
 	var ok bool
 	return c.call(ctx, "sendChatAction", map[string]any{"chat_id": chatID, "action": action}, nil, &ok)

@@ -17,8 +17,10 @@ from .types import (
     ChatID,
     MessageID,
     Update,
+    WebhookInfo,
     message_from_wire,
     update_from_wire,
+    webhook_info_from_wire,
 )
 
 #: Server maximums, hardcoded because the server does not publish them yet
@@ -114,6 +116,11 @@ class Client:
             body["reply_to_message_id"] = reply_to_message_id
         headers = {"Idempotency-Key": idempotency_key} if idempotency_key else None
         return message_from_wire(await self._call("sendMessage", body, headers))
+
+    async def get_webhook_info(self) -> WebhookInfo:
+        """Report the bot's webhook state. Empty ``state`` means still polling."""
+        raw = await self._call("getWebhookInfo", {})
+        return webhook_info_from_wire(raw if isinstance(raw, dict) else {})
 
     async def send_chat_action(self, *, chat_id: ChatID, action: ChatAction = "typing") -> bool:
         await self._call("sendChatAction", {"chat_id": chat_id, "action": action})

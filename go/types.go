@@ -49,6 +49,34 @@ type Identity struct {
 	DisplayName string
 }
 
+// WebhookInfo is what getWebhookInfo reports.
+//
+// An empty State means the bot has no destination registered and is still
+// polling; active and suspended are the webhook states. HasSecretToken answers
+// "is one configured", never "which one" — the server does not reveal it and
+// neither does this.
+type WebhookInfo struct {
+	URL                string
+	HasSecretToken     bool
+	PendingUpdateCount int64
+	// LastError* describe the LAST RUN of failures, not all time: a successful
+	// delivery clears them. An error from three days ago beside a working
+	// webhook explains nothing.
+	LastErrorAt      time.Time
+	LastErrorMessage string
+	// State is empty while polling.
+	State string
+}
+
+type wireWebhookInfo struct {
+	URL                string `json:"url"`
+	HasSecretToken     bool   `json:"has_secret_token"`
+	PendingUpdateCount int64  `json:"pending_update_count"`
+	LastErrorDate      int64  `json:"last_error_date"`
+	LastErrorMessage   string `json:"last_error_message"`
+	State              string `json:"state"`
+}
+
 // ChatAction is a closed set on purpose: Telegram's vocabulary is valid in
 // Telegram and 400 ACTION_NOT_SUPPORTED here.
 type ChatAction string
