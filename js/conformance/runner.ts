@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { BotFactory, BotUnderTest } from "./adapter.js";
-import type { ManagementFactory, ManagementUnderTest } from "./admin-adapter.js";
+import type { AdminFactory, AdminUnderTest } from "./admin-adapter.js";
 import { FakeServer } from "./fake-server.js";
 import { failure, matchHeaders, matchPartial, type Captures } from "./matchers.js";
 import type { ConformanceCase, Failure, Json } from "./types.js";
@@ -24,7 +24,7 @@ export async function loadCase(path: string): Promise<ConformanceCase> {
 export async function runCase(
   testCase: ConformanceCase,
   factory: BotFactory,
-  managementFactory?: ManagementFactory,
+  managementFactory?: AdminFactory,
 ): Promise<CaseResult> {
   if (testCase.kind === "management") {
     if (!managementFactory) {
@@ -90,12 +90,12 @@ export async function runCase(
  */
 async function runManagementCase(
   testCase: ConformanceCase,
-  factory: ManagementFactory,
+  factory: AdminFactory,
 ): Promise<CaseResult> {
   const server = new FakeServer(testCase.exchanges);
   await server.start();
   const failures: Failure[] = [];
-  let client: ManagementUnderTest | null = null;
+  let client: AdminUnderTest | null = null;
   try {
     client = factory.create({ baseUrl: server.baseUrl });
     for (const call of testCase.calls ?? []) {
@@ -112,7 +112,7 @@ async function runManagementCase(
   return { case: testCase, failures };
 }
 
-function checkManagementAssertions(testCase: ConformanceCase, client: ManagementUnderTest): Failure[] {
+function checkManagementAssertions(testCase: ConformanceCase, client: AdminUnderTest): Failure[] {
   const failures: Failure[] = [];
   const want = testCase.assert;
   if (!want) return failures;

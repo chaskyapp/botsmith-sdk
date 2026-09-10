@@ -1,4 +1,8 @@
-/** Management view types, mirroring the server's allowlisted projections. */
+/**
+ * View types for the server's management surface, mirroring its allowlisted
+ * projections. The package is called `admin` after its audience; these names
+ * follow the server's own, which is `/bot-management`.
+ */
 
 export interface BotView {
   id: string;

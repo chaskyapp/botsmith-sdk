@@ -15,7 +15,7 @@ export interface ReportedAdminError {
   message: string;
 }
 
-export interface ManagementUnderTest {
+export interface AdminUnderTest {
   /** Invoke one client method. Resolves with its result or records the error. */
   invoke(method: string, args: Record<string, unknown>): Promise<void>;
   /** Whatever each call returned, in order. */
@@ -26,6 +26,6 @@ export interface ManagementUnderTest {
   describe(): string;
 }
 
-export interface ManagementFactory {
-  create(options: { baseUrl: string }): ManagementUnderTest;
+export interface AdminFactory {
+  create(options: { baseUrl: string }): AdminUnderTest;
 }

@@ -10,14 +10,14 @@
  * it checks nothing.
  */
 import type {
-  ManagementFactory,
-  ManagementUnderTest,
-  ReportedManagementError,
+  AdminFactory,
+  AdminUnderTest,
+  ReportedAdminError,
 } from "../admin-adapter.js";
 
-class BrokenManagementClient implements ManagementUnderTest {
+class BrokenAdminClient implements AdminUnderTest {
   readonly results: unknown[] = [];
-  readonly errors: ReportedManagementError[] = [];
+  readonly errors: ReportedAdminError[] = [];
   readonly warnings: string[] = [];
 
   constructor(private readonly baseUrl: string) {}
@@ -52,10 +52,10 @@ class BrokenManagementClient implements ManagementUnderTest {
   }
 
   describe(): string {
-    return "BrokenManagementClient";
+    return "BrokenAdminClient";
   }
 }
 
-export const managementFactory: ManagementFactory = {
-  create: ({ baseUrl }) => new BrokenManagementClient(baseUrl),
+export const managementFactory: AdminFactory = {
+  create: ({ baseUrl }) => new BrokenAdminClient(baseUrl),
 };

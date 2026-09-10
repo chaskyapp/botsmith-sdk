@@ -1,5 +1,5 @@
 /**
- * Management errors are a SEPARATE type from the runtime's, and that separation
+ * Admin errors are a SEPARATE type from the runtime's, and that separation
  * is requirement R-B in §6 of the contract, not a stylistic choice.
  *
  * A `409` means STOP on the runtime (another instance evicted you) and RE-READ

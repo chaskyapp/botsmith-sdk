@@ -1,11 +1,11 @@
 import { AdminClient } from "../admin/src/client.js";
 import { AdminError } from "../admin/src/errors.js";
-import type { ManagementFactory, ManagementUnderTest, ReportedAdminError } from "./admin-adapter.js";
+import type { AdminFactory, AdminUnderTest, ReportedAdminError } from "./admin-adapter.js";
 
 const TEST_API_SECRET = "test-api-secret";
 const TEST_BEARER = "test-session-bearer";
 
-class SdkManagementUnderTest implements ManagementUnderTest {
+class SdkAdminUnderTest implements AdminUnderTest {
   private readonly client: AdminClient;
   readonly results: unknown[] = [];
   readonly errors: ReportedAdminError[] = [];
@@ -64,6 +64,6 @@ function toReported(error: unknown): ReportedAdminError {
   return { message: error instanceof Error ? error.message : String(error) };
 }
 
-export const managementFactory: ManagementFactory = {
-  create: ({ baseUrl }) => new SdkManagementUnderTest(baseUrl),
+export const managementFactory: AdminFactory = {
+  create: ({ baseUrl }) => new SdkAdminUnderTest(baseUrl),
 };
