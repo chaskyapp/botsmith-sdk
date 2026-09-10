@@ -1,0 +1,50 @@
+{
+  "id": "m6-create-bot-cancels-what-it-half-started",
+  "kind": "management",
+  "contractVersion": "1.0",
+  "guarantee": "M4",
+  "title": "A failure mid-dialogue cancels the half-built draft instead of abandoning it",
+  "why": "The dialogue is one shared, stateful conversation per actor. If createBot dies between /newbot and confirm, it leaves that conversation parked on 'enter a username' — so the next thing anyone does, including a person opening the portal, starts from a half-built draft they did not create. Driving a conversation means owning its cleanup: the facade sends /cancel on the way out. The rejected username here is the realistic trigger, since the server normalises and validates it.",
+
+  "calls": [
+    { "method": "createBot", "args": { "name": "MyBot", "username": "!!invalid!!" } }
+  ],
+
+  "exchanges": [
+    {
+      "expect": { "method": "GET", "path": "/bot-management/dialogue" },
+      "respond": { "status": 200, "body": { "ok": true, "data": {
+        "current": { "revision": 3, "step": "menu", "draft": {}, "receipt": { "operationID": "00000000-0000-4000-8000-000000000000", "state": "completed" }, "messageCode": "MENU", "createdAt": "2026-09-09T12:00:00Z" },
+        "items": [], "hasMore": false
+      } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands", "body": { "command": "/newbot", "expectedRevision": 3 } },
+      "respond": { "status": 200, "body": { "ok": true, "data": { "event": {
+        "revision": 4, "step": "new_name", "draft": {},
+        "receipt": { "operationID": "11111111-1111-4111-8111-111111111111", "state": "completed" },
+        "messageCode": "ENTER_NAME", "createdAt": "2026-09-09T12:00:01Z" } } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands", "body": { "command": "value", "value": "MyBot", "expectedRevision": 4 } },
+      "respond": { "status": 200, "body": { "ok": true, "data": { "event": {
+        "revision": 5, "step": "new_username", "draft": { "name": "MyBot" },
+        "receipt": { "operationID": "22222222-2222-4222-8222-222222222222", "state": "completed" },
+        "messageCode": "ENTER_USERNAME", "createdAt": "2026-09-09T12:00:02Z" } } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands", "body": { "command": "value", "value": "!!invalid!!", "expectedRevision": 5 } },
+      "respond": { "status": 400, "body": { "ok": false, "error": { "code": "INVALID_INPUT" } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands", "body": { "command": "/cancel", "expectedRevision": 5 } },
+      "respond": { "status": 200, "body": { "ok": true, "data": { "event": {
+        "revision": 6, "step": "menu", "draft": {},
+        "receipt": { "operationID": "33333333-3333-4333-8333-333333333333", "state": "completed" },
+        "messageCode": "CANCELLED", "createdAt": "2026-09-09T12:00:03Z" } } } }
+    }
+  ],
+
+  "assert": { "errorsReported": [ { "managementCode": "INVALID_INPUT", "retryable": false, "accessLost": false } ] },
+  "run": { "timeoutMs": 5000 }
+}

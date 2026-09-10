@@ -148,6 +148,17 @@ function checkManagementAssertions(testCase: ConformanceCase, client: AdminUnder
     );
   }
 
+  if (want.createdBotId !== undefined) {
+    const reported = client.results.some(
+      (result) => (result as { botId?: string } | null)?.botId === want.createdBotId,
+    );
+    if (!reported) {
+      failures.push(
+        failure("assert.createdBotId", `expected the facade to report creating ${want.createdBotId}`),
+      );
+    }
+  }
+
   if (want.secretReturnedOnce !== undefined) {
     const returned = client.results.some((result) => JSON.stringify(result ?? null).includes(want.secretReturnedOnce!));
     if (!returned) {

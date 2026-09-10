@@ -28,6 +28,8 @@ class SdkAdminUnderTest implements AdminUnderTest {
     }
   }
 
+  /** Exposed so a case can assert on what a facade call returned. */
+
   private call(method: string, args: Record<string, unknown>): Promise<unknown> {
     switch (method) {
       case "capability":
@@ -40,6 +42,8 @@ class SdkAdminUnderTest implements AdminUnderTest {
         return this.client.dialogue(args as never);
       case "command":
         return this.client.command(args as never);
+      case "createBot":
+        return this.client.createBot(args as never);
       case "grant":
         return this.client.grant(String(args["targetId"]), args as never);
       default:

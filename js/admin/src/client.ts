@@ -1,4 +1,5 @@
 import { AdminError, AdminTransportError, codeFor } from "./errors.js";
+import { createBot, type CreateBotParams, type CreateBotResult } from "./facade.js";
 import { assertServerOnly, type PlatformSecret } from "./guard.js";
 import type {
   BotView,
@@ -99,6 +100,15 @@ export class AdminClient {
       body["expectedCredentialVersion"] = params.expectedCredentialVersion;
     }
     return this.request<CommandResult>("POST", "/commands", body, undefined, signal);
+  }
+
+  /**
+   * Create a bot in one call, driving the four-step dialogue underneath.
+   *
+   * See facade.ts for what this can and cannot hide.
+   */
+  createBot(params: CreateBotParams): Promise<CreateBotResult> {
+    return createBot(this, params);
   }
 
   grant(

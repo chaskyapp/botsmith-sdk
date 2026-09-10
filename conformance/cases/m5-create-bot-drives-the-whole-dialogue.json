@@ -1,0 +1,57 @@
+{
+  "id": "m5-create-bot-drives-the-whole-dialogue",
+  "kind": "management",
+  "contractVersion": "1.0",
+  "guarantee": "M4",
+  "title": "createBot walks the four dialogue steps and returns the new bot's id",
+  "why": "Creating a bot through /bot-management/commands is a conversation: /newbot, the name, the username, confirm — four chained POSTs, each carrying the revision the last one returned. That shape is right for a person typing in a portal and hostile for a CI job. Absorbing it is the same job the runtime does with offset arithmetic and idempotency keys: the caller says what they want once, the SDK deals with the protocol. This case pins the sequence, the revision chaining, and that the resulting botID reaches the caller.",
+
+  "calls": [
+    { "method": "createBot", "args": { "name": "MyBot", "username": "mybot" } }
+  ],
+
+  "exchanges": [
+    {
+      "expect": { "method": "GET", "path": "/bot-management/dialogue" },
+      "respond": { "status": 200, "body": { "ok": true, "data": {
+        "current": { "revision": 7, "step": "menu", "draft": {}, "receipt": { "operationID": "00000000-0000-4000-8000-000000000000", "state": "completed" }, "messageCode": "MENU", "createdAt": "2026-09-09T12:00:00Z" },
+        "items": [], "hasMore": false
+      } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands",
+                  "body": { "command": "/newbot", "expectedRevision": 7, "value": "$absent" } },
+      "respond": { "status": 200, "body": { "ok": true, "data": { "event": {
+        "revision": 8, "step": "new_name", "draft": {},
+        "receipt": { "operationID": "11111111-1111-4111-8111-111111111111", "state": "completed" },
+        "messageCode": "ENTER_NAME", "createdAt": "2026-09-09T12:00:01Z" } } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands",
+                  "body": { "command": "value", "value": "MyBot", "expectedRevision": 8 } },
+      "respond": { "status": 200, "body": { "ok": true, "data": { "event": {
+        "revision": 9, "step": "new_username", "draft": { "name": "MyBot" },
+        "receipt": { "operationID": "22222222-2222-4222-8222-222222222222", "state": "completed" },
+        "messageCode": "ENTER_USERNAME", "createdAt": "2026-09-09T12:00:02Z" } } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands",
+                  "body": { "command": "value", "value": "mybot", "expectedRevision": 9 } },
+      "respond": { "status": 200, "body": { "ok": true, "data": { "event": {
+        "revision": 10, "step": "confirm_create", "draft": { "name": "MyBot", "username": "mybot", "action": "/newbot" },
+        "receipt": { "operationID": "33333333-3333-4333-8333-333333333333", "state": "completed" },
+        "messageCode": "CONFIRM_CREATE", "createdAt": "2026-09-09T12:00:03Z" } } } }
+    },
+    {
+      "expect": { "method": "POST", "path": "/bot-management/commands",
+                  "body": { "command": "confirm", "expectedRevision": 10 } },
+      "respond": { "status": 200, "body": { "ok": true, "data": { "event": {
+        "revision": 11, "step": "bot_menu", "draft": { "botID": "bot:new-one" },
+        "receipt": { "operationID": "44444444-4444-4444-8444-444444444444", "botID": "bot:new-one", "state": "completed" },
+        "messageCode": "MENU", "createdAt": "2026-09-09T12:00:04Z" } } } }
+    }
+  ],
+
+  "assert": { "errorsReported": [], "createdBotId": "bot:new-one" },
+  "run": { "timeoutMs": 5000 }
+}

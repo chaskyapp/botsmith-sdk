@@ -37,11 +37,13 @@ export interface HandlerSpec {
 }
 
 export interface ManagementCall {
-  method: "capability" | "bots" | "bot" | "dialogue" | "command" | "grant";
+  method: "capability" | "bots" | "bot" | "dialogue" | "command" | "grant" | "createBot";
   args?: Record<string, Json>;
 }
 
 export interface Assertions {
+  /** Management: the id of the bot a facade call reports having created. */
+  createdBotId?: string;
   /** Management: the revealed token must come back from the call itself. */
   secretReturnedOnce?: string;
   /** Management: and appear in none of these places. */
