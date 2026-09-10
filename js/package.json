@@ -1,6 +1,6 @@
 {
   "name": "@chasky/botsmith",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Client SDK for the Chasky Bot API",
   "type": "module",
@@ -8,17 +8,35 @@
     "node": ">=20"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "conformance": "tsx conformance/run.ts",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx scripts/smoke.ts",
-    "smoke:admin": "tsx scripts/smoke-admin.ts"
+    "smoke:admin": "tsx scripts/smoke-admin.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run typecheck && npm run conformance && npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
-  }
+  },
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chaskyapp/botsmith-sdk",
+    "directory": "js"
+  },
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false
 }
