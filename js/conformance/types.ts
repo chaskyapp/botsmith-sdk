@@ -5,7 +5,10 @@ export type Json = null | boolean | number | string | Json[] | { [k: string]: Js
 
 export interface ExpectedRequest {
   method?: string;
+  /** Path only, without a query string. */
   path?: string;
+  /** Partial match on the query string; values compare as strings. */
+  query?: Record<string, Json>;
   body?: Record<string, Json>;
   headers?: Record<string, string>;
 }

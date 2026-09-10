@@ -3,6 +3,7 @@ package conformance
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -112,10 +113,24 @@ func checkRequests(c Case, fake *FakeServer) []Failure {
 		if expected.Method != "" && expected.Method != actual.Method {
 			note(i+1, fmt.Sprintf("expected method %s, got %s", expected.Method, actual.Method))
 		}
+		// The observed path carries the query string; the case declares them
+		// separately so a query can be partially matched like a body.
+		actualPath, actualQuery, _ := strings.Cut(actual.Path, "?")
 		if expected.Path != "" {
 			want := strings.ReplaceAll(expected.Path, "{token}", TestToken)
-			if want != actual.Path {
-				note(i+1, fmt.Sprintf("expected path %s, got %s", redact(want), redact(actual.Path)))
+			if want != actualPath {
+				note(i+1, fmt.Sprintf("expected path %s, got %s", redact(want), redact(actualPath)))
+			}
+		}
+		if len(expected.Query) > 0 {
+			observed := map[string]any{}
+			if values, err := url.ParseQuery(actualQuery); err == nil {
+				for key := range values {
+					observed[key] = values.Get(key)
+				}
+			}
+			if reason := matchPartial(expected.Query, observed, captures, "query"); reason != "" {
+				note(i+1, reason)
 			}
 		}
 		if len(expected.Headers) > 0 {

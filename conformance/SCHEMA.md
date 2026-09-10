@@ -57,7 +57,16 @@ the format work:
 
 ### `expect`
 
-- `method`, `path` — `path` may contain `{token}`, substituted by the runner.
+- `method`, `path` — `path` is the **path only, without a query string**, and
+  may contain `{token}`, substituted by the runner.
+- `query` — **partial match**, like `body`: declared keys must match, undeclared
+  ones are ignored, and every matcher works. Values compare as strings, since
+  that is what a query string carries.
+
+  Splitting `query` out of `path` matters more than it looks. While they were
+  one field, a case had to spell out every query parameter exactly or fail, and
+  could not use `$any` on one — so a case about a dialogue sequence broke
+  because the client sent a `?limit=1` it had no opinion about.
 - `body` — **partial match**: declared fields must match, undeclared fields are
   ignored. Use `"$absent"` to require a field is missing.
 - `headers` — same partial-match rule, header names case-insensitive.

@@ -7,6 +7,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import parse_qsl
 from typing import Any, Callable, Protocol
 
 from .fake import FakeServer
@@ -229,12 +230,20 @@ def _check_requests(case: dict[str, Any], fake: FakeServer) -> list[Failure]:
         actual = observed[index]
         if expected.get("method") and expected["method"] != actual.method:
             problems.append((index + 1, f"expected method {expected['method']}, got {actual.method}"))
+        # The observed path carries the query string; the case declares them
+        # separately so a query can be partially matched like a body.
+        actual_path, _, actual_query = actual.path.partition("?")
         if expected.get("path"):
             want = expected["path"].replace("{token}", TEST_TOKEN)
-            if want != actual.path:
+            if want != actual_path:
                 problems.append(
-                    (index + 1, f"expected path {redact(want)}, got {redact(actual.path)}")
+                    (index + 1, f"expected path {redact(want)}, got {redact(actual_path)}")
                 )
+        if expected.get("query"):
+            observed = {k: v for k, v in parse_qsl(actual_query)}
+            reason = match_partial(expected["query"], observed, captures, "query")
+            if reason:
+                problems.append((index + 1, reason))
         if expected.get("headers"):
             reason = match_headers(expected["headers"], actual.headers, captures)
             if reason:

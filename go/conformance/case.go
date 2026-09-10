@@ -14,8 +14,11 @@ import (
 )
 
 type ExpectedRequest struct {
-	Method  string            `json:"method"`
-	Path    string            `json:"path"`
+	Method string `json:"method"`
+	// Path is the path only, without a query string.
+	Path string `json:"path"`
+	// Query is partially matched, like Body; values compare as strings.
+	Query   map[string]any    `json:"query"`
 	Body    map[string]any    `json:"body"`
 	Headers map[string]string `json:"headers"`
 }

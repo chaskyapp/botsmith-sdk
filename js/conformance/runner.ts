@@ -223,11 +223,20 @@ function checkRequests(testCase: ConformanceCase, server: FakeServer): Failure[]
     if (expected.method && expected.method !== actual.method) {
       note(i + 1, `expected method ${expected.method}, got ${actual.method}`);
     }
+    // The observed path carries the query string; the case declares them
+    // separately so a query can be partially matched like a body.
+    const [actualPath, actualQuery = ""] = actual.path.split("?");
     if (expected.path) {
       const want = expected.path.replaceAll("{token}", TEST_TOKEN);
-      if (want !== actual.path) {
-        note(i + 1, `expected path ${redact(want)}, got ${redact(actual.path)}`);
+      if (want !== actualPath) {
+        note(i + 1, `expected path ${redact(want)}, got ${redact(actualPath!)}`);
       }
+    }
+    if (expected.query) {
+      const observed: Record<string, Json> = {};
+      for (const [key, value] of new URLSearchParams(actualQuery)) observed[key] = value;
+      const reason = matchPartial(expected.query as Record<string, Json>, observed, captures, "query");
+      if (reason) note(i + 1, reason);
     }
     if (expected.headers) {
       const reason = matchHeaders(expected.headers, actual.headers, captures);
