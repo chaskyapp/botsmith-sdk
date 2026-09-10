@@ -918,20 +918,20 @@ These come out of this analysis and are `backend-api-go` tickets, not SDK work.
   before losing messages; that number is not published today.
 - **S5 — `Retry-After` on BotSmith's `429`.** Minor. Without the header, a
   `TOO_MANY_ATTEMPTS` client can only guess the backoff.
-- **S6 — A developer API for the SDK, with its own `sk_` key.** *Not a papercut
-  like S2–S5: it decides whether third parties can manage their own bots at all.*
+- **S6 — A developer key for `/bot-management`.** *Not a papercut like S2–S5: it
+  decides whether third parties can manage their own bots at all.*
 
-  A **new** surface under `/developer/…`, authenticated by
-  `x-chasky-dev-secret: sk_…`, scoped to the bots its owner owns.
-  `/bot-management` is untouched: the portal keeps its dialogue, its session and
-  its `X-Secret`.
+  Mark the `/bot-management` group `IsPublic` so it skips the global `X-Secret`
+  gate, and give the group its own middleware validating
+  `x-chasky-dev-secret: sk_…`, scoped to the bots its owner owns. **The bot
+  runtime already works exactly this way** — `IsPublic` plus
+  `ResolveBotToken` — so this is a pattern in production, not a new design.
 
-  Two reasons. It separates the credential without forcing the portal to migrate
-  in lockstep — and, more importantly, **the dialogue is a bad API for code**:
-  creating a bot through it is four chained POSTs carrying conversational state,
-  where a developer surface makes it one. The two would be adapters over the same
-  `botsmith` domain, so they cannot drift. Full proposal in
-  [`02-developer-api.md`](02-developer-api.md).
+  The risk is the same one this repo already survived once: `IsPublic` removes a
+  guard, and a replacement that fails open serves bot administration to anyone.
+  The middleware must be fail-closed by construction, and tested against an
+  **absent** header, not only a wrong one. Full proposal, including what the SDK
+  should absorb, in [`02-developer-api.md`](02-developer-api.md).
 
 ---
 
