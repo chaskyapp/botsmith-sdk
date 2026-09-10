@@ -47,9 +47,14 @@ cp .env.example .env    # then fill in the token, never export it on a command l
 
 | | Command |
 |---|---|
-| TypeScript | `cd js && npm run smoke` |
-| Go | `cd go && go run ./cmd/smoke` |
-| Python | `cd python && .venv/bin/python smoke.py` |
+| TypeScript | `cd js && npm run smoke` · `npm run smoke:management` |
+| Go | `cd go && go run ./cmd/smoke` · `go run ./cmd/smoke-management` |
+| Python | `cd python && .venv/bin/python smoke.py` · `smoke_management.py` |
+
+The management smokes need a **different pair of credentials** — a human session
+plus the platform API secret — and are **read-only by default**. Their commands
+create bots, rotate credentials and reveal tokens against real data, so writes
+sit behind an explicit `--allow-writes`, and even that only sends `/help`.
 
 ## Running conformance
 

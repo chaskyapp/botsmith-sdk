@@ -14,7 +14,8 @@
   "scripts": {
     "conformance": "tsx conformance/run.ts",
     "typecheck": "tsc --noEmit",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "smoke:management": "tsx scripts/smoke-management.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
