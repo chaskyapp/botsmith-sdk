@@ -5,6 +5,13 @@ import type { DialogueEvent } from "./types.js";
 /**
  * Ergonomic wrappers over the dialogue.
  *
+ * NOTE — a bot created here is PRIVATE. Since server delta 15, new bots default
+ * to private: they do not appear in directory search, and the opener answers 404
+ * to anyone but the owner. That is deliberate on the server's side — a bot stays
+ * undiscoverable while you test it, and publishing is a separate, conscious act.
+ * A caller who expects `createBot` to produce something people can find has to
+ * follow it with the `publish` command.
+ *
  * `/bot-management/commands` is a conversational state machine: creating a bot
  * is /newbot, the name, the username, confirm — four chained POSTs, each
  * carrying the revision the last one returned. That is the right shape for a

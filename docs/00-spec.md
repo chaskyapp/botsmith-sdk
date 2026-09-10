@@ -110,6 +110,20 @@ POST <base>/bots/{botID}/conversation     (human session — the "/start")
 GET  <base>/bots/search/{query}           (human session)
 ```
 
+Two properties of these that the SDK does not call but a caller has to know
+(server delta 15, verified 24/24 in the app):
+
+- **The directory search matches the WHOLE handle, not a prefix, and has no
+  pagination**: the result is zero bots or one. `cc-herm` finds nothing;
+  `cc-hermes-assistant` finds that bot. The reason is not simplicity — prefix
+  search let anyone **harvest the directory** by walking `a`, `b`, `c` and
+  enumerate every public bot. Exact matching means you can only confirm a handle
+  you already knew.
+- **The opener answers `404`, not `403`, when a private bot is not yours.** A
+  `403` would confirm the bot exists and turn the opener into an oracle for
+  handles, right after exact search closed that door. A private bot must be
+  indistinguishable from one that does not exist.
+
 ### 2.3 BotSmith surface (management)
 
 ```
@@ -773,6 +787,24 @@ What this section got right, and why it cost nothing to be wrong: **D4 kept the
 webhook as a transport seam with no commitment to its shape.** So there is
 nothing to unpick — only something to add. Had the SDK invented a webhook API
 back then, it would be wrong now in a way that shipped.
+
+### Reconciliation of 2026-09-10, and what it did not cover
+
+Deltas 15 to 20 in the server repo were read after discovering this SDK had been
+written against a branch 48 commits behind. Of those:
+
+- **15 (exact search and visibility)** changed behaviour the contract describes:
+  both points in §2.2, and **new bots now default to private**, which is noted on
+  every `createBot` facade.
+- **16 and 17** are closure reports — test runs and turning on the pilot gates.
+  They change no contract.
+- **12, 18, 19, 20** are the webhook, corrected in this section.
+
+Checking the branch distance first would have saved the detour:
+
+```bash
+git rev-list --left-right --count HEAD...<branch>
+```
 
 ### How the SDK was wrong about this at all
 
