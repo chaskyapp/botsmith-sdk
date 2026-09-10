@@ -7,14 +7,14 @@ import json
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from chasky_botsmith.management import CommandParams, ManagementClient, ManagementError, PageParams
+from chasky_botsmith_admin import CommandParams, AdminClient, AdminError, PageParams
 
 TEST_API_SECRET = "test-api-secret"
 TEST_BEARER = "test-session-bearer"
 
 
 @dataclass(slots=True)
-class ReportedManagementError:
+class ReportedAdminError:
     """What a case asserts on.
 
     Each SDK's adapter translates its own representation into these fields,
@@ -30,7 +30,7 @@ class ReportedManagementError:
 
 class ManagementUnderTest(Protocol):
     results: list[Any]
-    errors: list[ReportedManagementError]
+    errors: list[ReportedAdminError]
     warnings: list[str]
 
     async def invoke(self, method: str, args: dict[str, Any]) -> None: ...
@@ -41,9 +41,9 @@ class ManagementUnderTest(Protocol):
 class SDKManagement:
     def __init__(self, base_url: str) -> None:
         self.results: list[Any] = []
-        self.errors: list[ReportedManagementError] = []
+        self.errors: list[ReportedAdminError] = []
         self.warnings: list[str] = []
-        self._client = ManagementClient(
+        self._client = AdminClient(
             base_url=base_url,
             api_secret=TEST_API_SECRET,
             bearer_token=TEST_BEARER,
@@ -52,9 +52,9 @@ class SDKManagement:
     async def invoke(self, method: str, args: dict[str, Any]) -> None:
         try:
             self.results.append(await self._call(method, args))
-        except ManagementError as error:
+        except AdminError as error:
             self.errors.append(
-                ReportedManagementError(
+                ReportedAdminError(
                     message=str(error),
                     management_code=error.code,
                     retryable=error.retryable,
@@ -62,7 +62,7 @@ class SDKManagement:
                 )
             )
         except Exception as error:  # noqa: BLE001
-            self.errors.append(ReportedManagementError(message=str(error)))
+            self.errors.append(ReportedAdminError(message=str(error)))
 
     async def _call(self, method: str, args: dict[str, Any]) -> Any:
         if method == "capability":

@@ -13,9 +13,29 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith` + `/management` | [`js/`](js/) — 15/15 conformance |
-| 2 | Go | `.../botsmith-sdk/go` + `/management` | [`go/`](go/) — 15/15 conformance |
-| 3 | Python | `chasky_botsmith` + `.management` | [`python/`](python/) — 15/15 conformance |
+| 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — 15/15 conformance |
+| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 15/15 conformance |
+| 3 | Python | `chasky-botsmith` | [`python/`](python/) — 15/15 conformance |
+
+## Administration is a separate package, on purpose
+
+The BotSmith admin surface (`/bot-management`) sits behind Chasky's **global API
+secret gate**, so calling it needs `X-Secret` — the platform's own secret, which
+no third party has or should have. The runtime's routes are marked public
+precisely so that a bot token is the only credential an external author needs.
+
+So the admin client is not part of the SDK a bot author installs:
+
+| | Bot author installs | Chasky's own BFF installs |
+|---|---|---|
+| npm | `@chasky/botsmith` | `@chasky/botsmith-admin` |
+| Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/admin` |
+| PyPI | `chasky-botsmith` | `chasky-botsmith-admin` |
+
+A leaked bot token lets someone post as that one bot: bad, bounded, closed by
+rotating it. A leaked platform secret opens every non-public route on the API.
+Shipping both in one artifact would have put a surface its own audience cannot
+use inside the package they install.
 
 All three pass the same eleven cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
@@ -47,14 +67,18 @@ cp .env.example .env    # then fill in the token, never export it on a command l
 
 | | Command |
 |---|---|
-| TypeScript | `cd js && npm run smoke` · `npm run smoke:management` |
-| Go | `cd go && go run ./cmd/smoke` · `go run ./cmd/smoke-management` |
-| Python | `cd python && .venv/bin/python smoke.py` · `smoke_management.py` |
+| TypeScript | `cd js && npm run smoke` · `npm run smoke:admin` |
+| Go | `cd go && go run ./cmd/smoke` · `go run ./cmd/smoke-admin` |
+| Python | `cd python && .venv/bin/python smoke.py` · `smoke_admin.py` |
 
-The management smokes need a **different pair of credentials** — a human session
-plus the platform API secret — and are **read-only by default**. Their commands
-create bots, rotate credentials and reveal tokens against real data, so writes
-sit behind an explicit `--allow-writes`, and even that only sends `/help`.
+The runtime smokes stand in for a **third-party bot author**: they use only what
+such an author has, a bot token. The admin smokes stand in for **Chasky's own
+BFF** — they authenticate with the platform secret, so they are not a
+third-party scenario at all.
+
+The admin smokes are **read-only by default**. Their commands create bots, rotate
+credentials and reveal tokens against real data, so writes sit behind an explicit
+`--allow-writes`, and even that only sends `/help`.
 
 ## Running conformance
 

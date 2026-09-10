@@ -13,7 +13,7 @@ import type {
   ManagementFactory,
   ManagementUnderTest,
   ReportedManagementError,
-} from "../management-adapter.js";
+} from "../admin-adapter.js";
 
 class BrokenManagementClient implements ManagementUnderTest {
   readonly results: unknown[] = [];

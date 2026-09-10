@@ -1,5 +1,15 @@
 """Client for BotSmith, the Chasky bot administration surface at /bot-management.
 
+NOT FOR BOT AUTHORS. Every route here sits behind Chasky's global API secret
+gate, so calling one needs X-Secret — the platform's own secret, which no third
+party has or should have. The ``chasky_botsmith`` distribution next door is the
+one a bot author installs, and the runtime's routes are marked public exactly so
+a token is the only credential they need.
+
+This exists for Chasky's own server-side callers: the portal's BFF and internal
+tooling. Separate distribution, separate name, so installing it is a decision
+rather than an accident.
+
 A SEPARATE module from the runtime on purpose, and the separation is requirement
 R-B in §6 of the contract rather than a stylistic choice. The two surfaces
 authenticate differently — a bot token in the path versus a human session plus
@@ -21,8 +31,8 @@ dataclass serialised wholesale would be rejected for a call the caller wrote
 correctly.
 """
 
-from .client import CommandParams, ManagementClient, PageParams
-from .errors import ManagementCode, ManagementError, ManagementTransportError
+from .client import CommandParams, AdminClient, PageParams
+from .errors import AdminCode, AdminError, AdminTransportError
 from .types import (
     BotView,
     Capability,
@@ -45,10 +55,10 @@ __all__ = [
     "DialogueEvent",
     "Draft",
     "GrantView",
-    "ManagementClient",
-    "ManagementCode",
-    "ManagementError",
-    "ManagementTransportError",
+    "AdminClient",
+    "AdminCode",
+    "AdminError",
+    "AdminTransportError",
     "OperationReceipt",
     "Page",
     "PageParams",

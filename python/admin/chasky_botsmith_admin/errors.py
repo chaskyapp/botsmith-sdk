@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-ManagementCode = Literal[
+AdminCode = Literal[
     "INVALID_INPUT",
     "UNAUTHORIZED",
     "FORBIDDEN",
@@ -17,7 +17,7 @@ ManagementCode = Literal[
     "UNKNOWN",
 ]
 
-_STATUS_TO_CODE: dict[int, ManagementCode] = {
+_STATUS_TO_CODE: dict[int, AdminCode] = {
     400: "INVALID_INPUT",
     401: "UNAUTHORIZED",
     403: "FORBIDDEN",
@@ -29,8 +29,8 @@ _STATUS_TO_CODE: dict[int, ManagementCode] = {
 }
 
 
-class ManagementError(Exception):
-    def __init__(self, code: ManagementCode, status: int, method: str) -> None:
+class AdminError(Exception):
+    def __init__(self, code: AdminCode, status: int, method: str) -> None:
         super().__init__(f"{method} failed: {code}")
         self.code = code
         self.status = status
@@ -59,11 +59,11 @@ class ManagementError(Exception):
         return self.code in ("UNAUTHORIZED", "FORBIDDEN")
 
 
-class ManagementTransportError(Exception):
+class AdminTransportError(Exception):
     """The request never produced an envelope."""
 
 
-def code_for(envelope_code: object, status: int) -> ManagementCode:
+def code_for(envelope_code: object, status: int) -> AdminCode:
     """Prefer the envelope's code; fall back to the status."""
     if isinstance(envelope_code, str) and envelope_code:
         return envelope_code  # type: ignore[return-value]

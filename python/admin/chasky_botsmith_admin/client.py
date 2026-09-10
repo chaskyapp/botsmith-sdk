@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 import httpx
 
-from .errors import ManagementError, ManagementTransportError, code_for
+from .errors import AdminError, AdminTransportError, code_for
 from .types import (
     BotView,
     Capability,
@@ -42,7 +42,7 @@ class CommandParams:
     operation_id: str | None = None
 
 
-class ManagementClient:
+class AdminClient:
     def __init__(
         self,
         *,
@@ -61,7 +61,7 @@ class ManagementClient:
         self._http = http or httpx.AsyncClient(timeout=30)
         self._new_operation_id = new_operation_id or (lambda: str(uuid.uuid4()))
 
-    async def __aenter__(self) -> "ManagementClient":
+    async def __aenter__(self) -> "AdminClient":
         return self
 
     async def __aexit__(self, *_exc: object) -> None:
@@ -73,7 +73,7 @@ class ManagementClient:
 
     def __repr__(self) -> str:
         # The API secret and the session token must not surface here.
-        return f"ManagementClient(base_url={self._base_url!r}, <credentials redacted>)"
+        return f"AdminClient(base_url={self._base_url!r}, <credentials redacted>)"
 
     async def capability(self) -> Capability:
         data = await self._request("GET", "/capability")
@@ -183,16 +183,16 @@ class ManagementClient:
                 json=body if body is not None else None,
             )
         except Exception as error:  # noqa: BLE001
-            raise ManagementTransportError(f"{label} could not reach the server: {error}") from error
+            raise AdminTransportError(f"{label} could not reach the server: {error}") from error
 
         try:
             envelope = response.json()
         except Exception as error:  # noqa: BLE001
-            raise ManagementTransportError(
+            raise AdminTransportError(
                 f"{label} returned a body that is not JSON (HTTP {response.status_code})"
             ) from error
 
         if not isinstance(envelope, dict) or not envelope.get("ok"):
             code = ((envelope or {}).get("error") or {}).get("code")
-            raise ManagementError(code_for(code, response.status_code), response.status_code, label)
+            raise AdminError(code_for(code, response.status_code), response.status_code, label)
         return envelope.get("data") or {}

@@ -10,7 +10,7 @@
  */
 
 /** The envelope's string codes. Unlike the runtime, the code IS a string here. */
-export type ManagementCode =
+export type AdminCode =
   | "INVALID_INPUT"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
@@ -22,14 +22,14 @@ export type ManagementCode =
   | "RECOVERY_REQUIRED"
   | "UNKNOWN";
 
-export class ManagementError extends Error {
-  readonly code: ManagementCode;
+export class AdminError extends Error {
+  readonly code: AdminCode;
   readonly status: number;
   readonly method: string;
 
-  constructor(code: ManagementCode, status: number, method: string) {
+  constructor(code: AdminCode, status: number, method: string) {
     super(`${method} failed: ${code}`);
-    this.name = "ManagementError";
+    this.name = "AdminError";
     this.code = code;
     this.status = status;
     this.method = method;
@@ -60,17 +60,17 @@ export class ManagementError extends Error {
   }
 }
 
-export class ManagementTransportError extends Error {
+export class AdminTransportError extends Error {
   override readonly cause: unknown;
 
   constructor(message: string, cause: unknown) {
     super(message);
-    this.name = "ManagementTransportError";
+    this.name = "AdminTransportError";
     this.cause = cause;
   }
 }
 
-const STATUS_TO_CODE: Record<number, ManagementCode> = {
+const STATUS_TO_CODE: Record<number, AdminCode> = {
   400: "INVALID_INPUT",
   401: "UNAUTHORIZED",
   403: "FORBIDDEN",
@@ -82,7 +82,7 @@ const STATUS_TO_CODE: Record<number, ManagementCode> = {
 };
 
 /** Prefer the envelope's code; fall back to the status when it is absent. */
-export function codeFor(envelopeCode: unknown, status: number): ManagementCode {
-  if (typeof envelopeCode === "string" && envelopeCode) return envelopeCode as ManagementCode;
+export function codeFor(envelopeCode: unknown, status: number): AdminCode {
+  if (typeof envelopeCode === "string" && envelopeCode) return envelopeCode as AdminCode;
   return STATUS_TO_CODE[status] ?? "UNKNOWN";
 }

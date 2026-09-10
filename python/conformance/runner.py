@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from .fake import FakeServer
-from .management_adapter import ManagementUnderTest, encode
-from .management_adapter import factory as sdk_management_factory
+from .admin_adapter import ManagementUnderTest, encode
+from .admin_adapter import factory as sdk_management_factory
 from .matchers import Captures, match_headers, match_partial
 
 #: A fixed test credential. Never a real token; cases refer to it as {token}.

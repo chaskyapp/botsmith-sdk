@@ -5,7 +5,7 @@
  * the other answers calls. Merging them here would be the same mistake R-A and
  * R-B in §6 of the contract exist to prevent, one layer up.
  */
-export interface ReportedManagementError {
+export interface ReportedAdminError {
   /** The envelope's string code, e.g. "STALE_STATE". */
   managementCode?: string | undefined;
   /** Whether re-reading and retrying is the right response. */
@@ -20,7 +20,7 @@ export interface ManagementUnderTest {
   invoke(method: string, args: Record<string, unknown>): Promise<void>;
   /** Whatever each call returned, in order. */
   readonly results: readonly unknown[];
-  readonly errors: readonly ReportedManagementError[];
+  readonly errors: readonly ReportedAdminError[];
   readonly warnings: readonly string[];
   /** How the client renders itself — must never contain a credential. */
   describe(): string;

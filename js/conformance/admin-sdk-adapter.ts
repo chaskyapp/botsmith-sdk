@@ -1,18 +1,18 @@
-import { ManagementClient } from "../src/management/client.js";
-import { ManagementError } from "../src/management/errors.js";
-import type { ManagementFactory, ManagementUnderTest, ReportedManagementError } from "./management-adapter.js";
+import { AdminClient } from "../admin/src/client.js";
+import { AdminError } from "../admin/src/errors.js";
+import type { ManagementFactory, ManagementUnderTest, ReportedAdminError } from "./admin-adapter.js";
 
 const TEST_API_SECRET = "test-api-secret";
 const TEST_BEARER = "test-session-bearer";
 
 class SdkManagementUnderTest implements ManagementUnderTest {
-  private readonly client: ManagementClient;
+  private readonly client: AdminClient;
   readonly results: unknown[] = [];
-  readonly errors: ReportedManagementError[] = [];
+  readonly errors: ReportedAdminError[] = [];
   readonly warnings: string[] = [];
 
   constructor(baseUrl: string) {
-    this.client = new ManagementClient({
+    this.client = new AdminClient({
       baseUrl,
       apiSecret: TEST_API_SECRET,
       bearerToken: TEST_BEARER,
@@ -52,8 +52,8 @@ class SdkManagementUnderTest implements ManagementUnderTest {
   }
 }
 
-function toReported(error: unknown): ReportedManagementError {
-  if (error instanceof ManagementError) {
+function toReported(error: unknown): ReportedAdminError {
+  if (error instanceof AdminError) {
     return {
       managementCode: error.code,
       retryable: error.retryable,

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { BotFactory, BotUnderTest } from "./adapter.js";
-import type { ManagementFactory, ManagementUnderTest } from "./management-adapter.js";
+import type { ManagementFactory, ManagementUnderTest } from "./admin-adapter.js";
 import { FakeServer } from "./fake-server.js";
 import { failure, matchHeaders, matchPartial, type Captures } from "./matchers.js";
 import type { ConformanceCase, Failure, Json } from "./types.js";

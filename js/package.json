@@ -8,14 +8,13 @@
     "node": ">=20"
   },
   "exports": {
-    ".": "./dist/index.js",
-    "./management": "./dist/management/index.js"
+    ".": "./dist/index.js"
   },
   "scripts": {
     "conformance": "tsx conformance/run.ts",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx scripts/smoke.ts",
-    "smoke:management": "tsx scripts/smoke-management.ts"
+    "smoke:admin": "tsx scripts/smoke-admin.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

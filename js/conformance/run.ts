@@ -19,7 +19,7 @@ async function main(): Promise<void> {
   const managementArg = valueOf(args, "--management-factory");
   const managementFactory = managementArg
     ? (await import(pathToFileURL(resolve(HERE, managementArg)).href)).managementFactory
-    : (await import("./management-sdk-adapter.js")).managementFactory;
+    : (await import("./admin-sdk-adapter.js")).managementFactory;
   // Without this line, "9 failed" reads as a broken SDK. It is a broken FIXTURE,
   // on purpose, and the run is measuring the runner rather than any SDK.
   const isFixture = factoryArg.includes("fixtures/") || (managementArg?.includes("fixtures/") ?? false);

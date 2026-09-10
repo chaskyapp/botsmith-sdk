@@ -1,4 +1,4 @@
-import { ManagementError, ManagementTransportError, codeFor } from "./errors.js";
+import { AdminError, AdminTransportError, codeFor } from "./errors.js";
 import type {
   BotView,
   Capability,
@@ -9,7 +9,7 @@ import type {
   Page,
 } from "./types.js";
 
-export interface ManagementClientOptions {
+export interface AdminClientOptions {
   baseUrl: string;
   /** A human session bearer token. Mutually exclusive with cookie auth. */
   bearerToken?: string | undefined;
@@ -43,14 +43,14 @@ export interface PageParams {
  * constructor taking either credential would make it writable to send the
  * platform secret from a bot process (R-A in §6 of the contract).
  */
-export class ManagementClient {
+export class AdminClient {
   private readonly baseUrl: string;
   private readonly bearerToken: string | undefined;
   private readonly apiSecret: string;
   private readonly doFetch: typeof globalThis.fetch;
   private readonly newOperationId: () => string;
 
-  constructor(options: ManagementClientOptions) {
+  constructor(options: AdminClientOptions) {
     if (!options.apiSecret) throw new Error("an API secret is required");
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.bearerToken = options.bearerToken;
@@ -142,21 +142,21 @@ export class ManagementClient {
         ...(signal ? { signal } : {}),
       } as RequestInit);
     } catch (error) {
-      throw new ManagementTransportError(`${method} ${path} could not reach the server`, error);
+      throw new AdminTransportError(`${method} ${path} could not reach the server`, error);
     }
 
     let envelope: { ok?: boolean; data?: T; error?: { code?: string } };
     try {
       envelope = (await response.json()) as typeof envelope;
     } catch (error) {
-      throw new ManagementTransportError(
+      throw new AdminTransportError(
         `${method} ${path} returned a body that is not JSON (HTTP ${response.status})`,
         error,
       );
     }
 
     if (!envelope.ok) {
-      throw new ManagementError(codeFor(envelope.error?.code, response.status), response.status, `${method} ${path}`);
+      throw new AdminError(codeFor(envelope.error?.code, response.status), response.status, `${method} ${path}`);
     }
     return envelope.data as T;
   }

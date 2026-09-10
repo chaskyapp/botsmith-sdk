@@ -131,6 +131,11 @@ the bot stops on its own, or at `timeoutMs`. Whichever comes first.
 
 ## Management cases
 
+> The case field stays `"kind": "management"` because it names the **server's**
+> surface, `/bot-management`. The client packages are called *admin* because
+> that names their **audience** — Chasky's own callers, not bot authors. Two
+> different things, deliberately spelled differently.
+
 The runtime is a loop; management is REST with optimistic concurrency. A case
 for it declares **which methods to invoke, in order**, instead of starting a bot
 and waiting.

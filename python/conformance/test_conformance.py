@@ -72,7 +72,7 @@ class ConformanceTest(unittest.IsolatedAsyncioTestCase):
         that serialises its params wholesale looks correct and gets 400
         INVALID_INPUT. m1 must fail against one.
         """
-        from .management_adapter import ReportedManagementError
+        from .admin_adapter import ReportedAdminError
         from .runner import run_management_case
 
         cases = {case["id"]: case for case in load_cases(CASES_DIR)}
@@ -85,7 +85,7 @@ class ConformanceTest(unittest.IsolatedAsyncioTestCase):
             def __init__(self, base_url: str) -> None:
                 self.base_url = base_url
                 self.results: list[object] = []
-                self.errors: list[ReportedManagementError] = []
+                self.errors: list[ReportedAdminError] = []
                 self.warnings: list[str] = []
 
             async def invoke(self, method: str, args: dict[str, object]) -> None:
