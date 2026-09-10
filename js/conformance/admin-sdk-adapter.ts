@@ -1,10 +1,9 @@
 import { AdminClient } from "../admin/src/client.js";
-import { asPlatformSecret } from "../admin/src/guard.js";
+import { asDeveloperKey } from "../admin/src/guard.js";
 import { AdminError } from "../admin/src/errors.js";
 import type { AdminFactory, AdminUnderTest, ReportedAdminError } from "./admin-adapter.js";
 
-const TEST_API_SECRET = "test-api-secret";
-const TEST_BEARER = "test-session-bearer";
+const TEST_DEVELOPER_KEY = "sk_test";
 
 class SdkAdminUnderTest implements AdminUnderTest {
   private readonly client: AdminClient;
@@ -15,8 +14,7 @@ class SdkAdminUnderTest implements AdminUnderTest {
   constructor(baseUrl: string) {
     this.client = new AdminClient({
       baseUrl,
-      apiSecret: asPlatformSecret(TEST_API_SECRET),
-      bearerToken: TEST_BEARER,
+      developerKey: asDeveloperKey(TEST_DEVELOPER_KEY),
     });
   }
 

@@ -1,6 +1,6 @@
 import { AdminError, AdminTransportError, codeFor } from "./errors.js";
 import { createBot, type CreateBotParams, type CreateBotResult } from "./facade.js";
-import { assertServerOnly, type PlatformSecret } from "./guard.js";
+import { assertServerOnly, type DeveloperKey } from "./guard.js";
 import type {
   BotView,
   Capability,
@@ -13,16 +13,17 @@ import type {
 
 export interface AdminClientOptions {
   baseUrl: string;
-  /** A human session bearer token. Mutually exclusive with cookie auth. */
-  bearerToken?: string | undefined;
   /**
-   * The platform API secret, sent as X-Secret.
+   * EXACTLY ONE of developerKey or bearerToken. Not zero, not both.
    *
-   * Typed as PlatformSecret rather than string so that passing it takes an
-   * explicit `asPlatformSecret(...)` — a line that reads wrong wherever it does
-   * not belong.
+   * The server rejects a request carrying two credentials instead of picking
+   * one, because picking by precedence hides a misconfiguration. This mirrors
+   * that rule at construction time, so the mistake surfaces where it was made
+   * rather than as an anonymous 401 on the first call.
    */
-  apiSecret: PlatformSecret;
+  developerKey?: DeveloperKey | undefined;
+  /** A human session bearer token — how the portal's own backend calls this. */
+  bearerToken?: string | undefined;
   fetch?: typeof globalThis.fetch | undefined;
   /** Supplies operationID values; override in tests for determinism. */
   newOperationId?: (() => string) | undefined;
@@ -43,28 +44,39 @@ export interface PageParams {
   limit?: number | undefined;
 }
 
+/** The header a developer key travels in. Never Authorization: see below. */
+const DEVELOPER_KEY_HEADER = "X-Chasky-Dev-Secret";
+
 /**
  * The management surface: BotSmith, at `/bot-management`.
  *
- * Its credential is a human session plus the platform secret — nothing to do
- * with a bot token — which is why it has its own constructor. A single
- * constructor taking either credential would make it writable to send the
- * platform secret from a bot process (R-A in §6 of the contract).
+ * Its credential is a developer key or a human session — nothing to do with a
+ * bot token — which is why it has its own constructor. A single constructor
+ * taking either credential would make it writable to send an administration
+ * credential from a bot process (R-A in §6 of the contract).
  */
 export class AdminClient {
   private readonly baseUrl: string;
   private readonly bearerToken: string | undefined;
-  private readonly apiSecret: string;
+  private readonly developerKey: string | undefined;
   private readonly doFetch: typeof globalThis.fetch;
   private readonly newOperationId: () => string;
 
   constructor(options: AdminClientOptions) {
     // Before anything else: this must not be running in a browser.
     assertServerOnly();
-    if (!options.apiSecret) throw new Error("an API secret is required");
+    if (options.developerKey && options.bearerToken) {
+      throw new Error(
+        "pass a developerKey or a bearerToken, not both: the server rejects a " +
+          "request carrying two credentials rather than choosing between them",
+      );
+    }
+    if (!options.developerKey && !options.bearerToken) {
+      throw new Error("a developerKey or a bearerToken is required");
+    }
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.bearerToken = options.bearerToken;
-    this.apiSecret = options.apiSecret;
+    this.developerKey = options.developerKey;
     this.doFetch = options.fetch ?? globalThis.fetch;
     this.newOperationId = options.newOperationId ?? (() => crypto.randomUUID());
   }
@@ -143,11 +155,12 @@ export class AdminClient {
     if (page?.limit !== undefined) query.set("limit", String(page.limit));
     const suffix = query.size > 0 ? `?${query}` : "";
 
-    const headers: Record<string, string> = { "X-Secret": this.apiSecret };
-    // Bearer OR cookie, never both: the server rejects anything but exactly one
-    // Authorization header with exactly two fields, and falls back to the
-    // cookie only when the header is absent.
-    if (this.bearerToken) headers["Authorization"] = `Bearer ${this.bearerToken}`;
+    // ONE credential leaves this client, never two. The server treats a key
+    // next to a session as a misconfiguration and answers 401 instead of
+    // choosing, so sending both would turn a working key into a mystery.
+    const headers: Record<string, string> = {};
+    if (this.developerKey) headers[DEVELOPER_KEY_HEADER] = this.developerKey;
+    else if (this.bearerToken) headers["Authorization"] = `Bearer ${this.bearerToken}`;
     if (body !== undefined) headers["Content-Type"] = "application/json";
 
     let response: Response;
@@ -155,8 +168,10 @@ export class AdminClient {
       response = await this.doFetch(`${this.baseUrl}/bot-management${path}${suffix}`, {
         method,
         headers,
-        // Cookie auth needs the browser to attach it.
-        credentials: "include",
+        // Cookies travel only on the session path. With a key they would be a
+        // SECOND credential on the same request, which the server rejects — so
+        // a stray cookie would break a perfectly good key.
+        credentials: this.developerKey ? "omit" : "include",
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
         ...(signal ? { signal } : {}),
       } as RequestInit);

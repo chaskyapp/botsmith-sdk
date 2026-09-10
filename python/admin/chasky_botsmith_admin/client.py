@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 import httpx
 
-from .errors import AdminError, AdminTransportError, PlatformSecret, code_for
+from .errors import AdminError, AdminTransportError, DeveloperKey, code_for
 from .types import (
     BotView,
     Capability,
@@ -42,20 +42,38 @@ class CommandParams:
     operation_id: str | None = None
 
 
+#: The header a developer key travels in. Never ``Authorization``: sharing that
+#: header with the session would make "brought two credentials" indistinguishable
+#: from "brought one".
+DEVELOPER_KEY_HEADER = "X-Chasky-Dev-Secret"
+
+
 class AdminClient:
     def __init__(
         self,
         *,
         base_url: str,
-        api_secret: PlatformSecret,
+        developer_key: DeveloperKey | None = None,
         bearer_token: str | None = None,
         http: httpx.AsyncClient | None = None,
         new_operation_id: Callable[[], str] | None = None,
     ) -> None:
-        if not api_secret:
-            raise ValueError("an API secret is required")
+        # EXACTLY ONE credential. Not zero, not both.
+        #
+        # The server rejects a request carrying two credentials instead of
+        # picking one, because picking by precedence hides a misconfiguration.
+        # This mirrors that rule at construction time, so the mistake surfaces
+        # where it was made rather than as an anonymous 401 on the first call.
+        if developer_key and bearer_token:
+            raise ValueError(
+                "pass a developer_key or a bearer_token, not both: the server "
+                "rejects a request carrying two credentials rather than "
+                "choosing between them"
+            )
+        if not developer_key and not bearer_token:
+            raise ValueError("a developer_key or a bearer_token is required")
         self._base_url = base_url.rstrip("/")
-        self._api_secret = api_secret
+        self._developer_key = developer_key
         self._bearer_token = bearer_token
         self._owns_http = http is None
         self._http = http or httpx.AsyncClient(timeout=30)
@@ -175,11 +193,13 @@ class AdminClient:
             if page.limit is not None:
                 params["limit"] = str(page.limit)
 
-        headers = {"X-Secret": self._api_secret}
-        # Bearer OR cookie, never both: the server rejects anything but exactly
-        # one Authorization header with exactly two fields, and only falls back
-        # to the cookie when the header is absent.
-        if self._bearer_token:
+        # ONE credential leaves this client, never two. The server treats a key
+        # next to a session as a misconfiguration and answers 401 instead of
+        # choosing, so sending both would turn a working key into a mystery.
+        headers: dict[str, str] = {}
+        if self._developer_key:
+            headers[DEVELOPER_KEY_HEADER] = self._developer_key
+        elif self._bearer_token:
             headers["Authorization"] = f"Bearer {self._bearer_token}"
 
         label = f"{method} {path}"

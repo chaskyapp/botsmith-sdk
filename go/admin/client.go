@@ -14,32 +14,49 @@ import (
 	"time"
 )
 
-// PlatformSecret is the platform's own API secret, deliberately not a string.
+// DeveloperKey is a developer's own administration credential, deliberately
+// not a string.
 //
-// A leaked bot token lets someone post as that one bot: bad, bounded, closed by
-// rotating it. This opens every non-public route on the API. They are not the
-// same incident, and the type keeps them from being passed to the same places.
-type PlatformSecret string
+// A leaked bot token lets someone post as that one bot. A leaked key lets them
+// administer every bot you own: create them, rotate their tokens, point their
+// webhooks at their own server. They are not the same incident, and the type
+// keeps them from being passed to the same places.
+type DeveloperKey string
 
-// AsPlatformSecret acknowledges a value as the platform secret.
-func AsPlatformSecret(value string) PlatformSecret { return PlatformSecret(value) }
+// AsDeveloperKey acknowledges a value as a developer key.
+//
+// The prefix is checked here and not only by the server so that pasting the
+// wrong secret fails where the mistake was made, naming what is wrong, instead
+// of arriving as an anonymous 401 on the first call.
+func AsDeveloperKey(value string) (DeveloperKey, error) {
+	if !strings.HasPrefix(value, "sk_") {
+		return "", fmt.Errorf("admin: a developer key starts with sk_")
+	}
+	return DeveloperKey(value), nil
+}
+
+// Options carries EXACTLY ONE credential: a developer key or a session bearer.
+//
+// Not zero, not both. The server rejects a request carrying two credentials
+// instead of picking one, because picking by precedence hides a
+// misconfiguration; New mirrors that rule so the mistake surfaces where it was
+// made rather than as an anonymous 401 on the first call.
+// developerKeyHeader is the header a key travels in. Never Authorization:
+// sharing that header with the session would make "brought two credentials"
+// indistinguishable from "brought one".
+const developerKeyHeader = "X-Chasky-Dev-Secret"
 
 type Options struct {
 	BaseURL string
-	// BearerToken is a human session token. The server accepts a bearer OR a
-	// cookie, never both: if an Authorization header is present it must be
-	// exactly one header with exactly two fields, and the cookie is only
-	// consulted when it is absent.
+	// DeveloperKey administers the bots of whoever issued it. Its own named
+	// type is the point: Go will not accept a bare string here, so passing it
+	// takes an explicit AsDeveloperKey(...) — a line that reads wrong wherever
+	// it does not belong.
+	DeveloperKey DeveloperKey
+	// BearerToken is a human session token — how the portal's own backend calls
+	// this surface.
 	BearerToken string
-	// APISecret goes in X-Secret. It is a PLATFORM secret and must never reach
-	// a browser or a bot process.
-	//
-	// Its own named type is the point: Go will not accept a bare string here, so
-	// passing it takes an explicit AsPlatformSecret(...) — a line that reads
-	// wrong wherever it does not belong. Go has no browser to guard against, so
-	// this is the layer that does the work.
-	APISecret  PlatformSecret
-	HTTPClient *http.Client
+	HTTPClient  *http.Client
 	// NewOperationID supplies operation ids; override for deterministic tests.
 	NewOperationID func() string
 }
@@ -47,14 +64,17 @@ type Options struct {
 type Client struct {
 	baseURL        string
 	bearerToken    string
-	apiSecret      PlatformSecret
+	developerKey   DeveloperKey
 	http           *http.Client
 	newOperationID func() string
 }
 
 func New(opts Options) (*Client, error) {
-	if opts.APISecret == "" {
-		return nil, fmt.Errorf("admin: an API secret is required")
+	if opts.DeveloperKey != "" && opts.BearerToken != "" {
+		return nil, fmt.Errorf("admin: pass a developer key or a bearer token, not both: the server rejects a request carrying two credentials rather than choosing between them")
+	}
+	if opts.DeveloperKey == "" && opts.BearerToken == "" {
+		return nil, fmt.Errorf("admin: a developer key or a bearer token is required")
 	}
 	httpClient := opts.HTTPClient
 	if httpClient == nil {
@@ -67,7 +87,7 @@ func New(opts Options) (*Client, error) {
 	return &Client{
 		baseURL:        strings.TrimRight(opts.BaseURL, "/"),
 		bearerToken:    opts.BearerToken,
-		apiSecret:      opts.APISecret,
+		developerKey:   opts.DeveloperKey,
 		http:           httpClient,
 		newOperationID: newID,
 	}, nil
@@ -189,8 +209,12 @@ func (c *Client) do(ctx context.Context, method, path string, body any, page Pag
 	if err != nil {
 		return &TransportError{Method: label, cause: err}
 	}
-	req.Header.Set("X-Secret", string(c.apiSecret))
-	if c.bearerToken != "" {
+	// ONE credential leaves this client, never two. The server treats a key next
+	// to a session as a misconfiguration and answers 401 instead of choosing, so
+	// sending both would turn a working key into a mystery.
+	if c.developerKey != "" {
+		req.Header.Set(developerKeyHeader, string(c.developerKey))
+	} else {
 		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
 	}
 	if body != nil {

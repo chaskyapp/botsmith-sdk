@@ -4,21 +4,29 @@ from __future__ import annotations
 
 from typing import Literal, NewType
 
-#: The platform's own API secret, deliberately not a plain ``str``.
+#: A developer's own administration credential, deliberately not a plain ``str``.
 #:
-#: A leaked bot token lets someone post as that one bot: bad, bounded, closed by
-#: rotating it. This opens every non-public route on the API. They are not the
-#: same incident, and a distinct type keeps them from being passed to the same
-#: places — a type checker rejects a bare string, and ``as_platform_secret(...)``
-#: reads wrong wherever it does not belong.
-PlatformSecret = NewType("PlatformSecret", str)
+#: A leaked bot token lets someone post as that one bot. A leaked key lets them
+#: administer every bot you own: create them, rotate their tokens, point their
+#: webhooks at their own server. They are not the same incident, and a distinct
+#: type keeps them from being passed to the same places — a type checker rejects
+#: a bare string, and ``as_developer_key(...)`` reads wrong wherever it does not
+#: belong.
+DeveloperKey = NewType("DeveloperKey", str)
 
 
-def as_platform_secret(value: str) -> PlatformSecret:
-    """Acknowledge a value as the platform secret."""
+def as_developer_key(value: str) -> DeveloperKey:
+    """Acknowledge a value as a developer key.
+
+    The prefix is checked here and not only by the server so that pasting the
+    wrong secret fails where the mistake was made, naming what is wrong, instead
+    of arriving as an anonymous 401 on the first call.
+    """
     if not value:
-        raise ValueError("the platform secret must not be empty")
-    return PlatformSecret(value)
+        raise ValueError("the developer key must not be empty")
+    if not value.startswith("sk_"):
+        raise ValueError("a developer key starts with sk_")
+    return DeveloperKey(value)
 
 AdminCode = Literal[
     "INVALID_INPUT",

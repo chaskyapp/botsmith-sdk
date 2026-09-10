@@ -10,10 +10,7 @@ import (
 	"github.com/chaskyapp/botsmith-sdk/go/admin"
 )
 
-const (
-	testAPISecret = "test-api-secret"
-	testBearer    = "test-session-bearer"
-)
+const testDeveloperKey = "sk_test"
 
 // ReportedManagementError is what a case asserts on. Each SDK's adapter
 // translates its own representation into these fields, exactly as it already
@@ -48,11 +45,11 @@ type sdkManagement struct {
 }
 
 func NewSDKManagement(baseURL string) ManagementUnderTest {
-	client, err := admin.New(admin.Options{
-		BaseURL:     baseURL,
-		APISecret:   admin.AsPlatformSecret(testAPISecret),
-		BearerToken: testBearer,
-	})
+	key, err := admin.AsDeveloperKey(testDeveloperKey)
+	if err != nil {
+		panic(fmt.Sprintf("conformance: could not build the management client: %s", err))
+	}
+	client, err := admin.New(admin.Options{BaseURL: baseURL, DeveloperKey: key})
 	if err != nil {
 		panic(fmt.Sprintf("conformance: could not build the management client: %s", err))
 	}
@@ -106,9 +103,9 @@ func (m *sdkManagement) call(ctx context.Context, method string, args map[string
 	}
 }
 
-func (m *sdkManagement) Results() []any                     { return m.results }
-func (m *sdkManagement) Errors() []ReportedManagementError  { return m.errs }
-func (m *sdkManagement) Warnings() []string                 { return m.warnings }
+func (m *sdkManagement) Results() []any                    { return m.results }
+func (m *sdkManagement) Errors() []ReportedManagementError { return m.errs }
+func (m *sdkManagement) Warnings() []string                { return m.warnings }
 func (m *sdkManagement) Describe() string {
 	return fmt.Sprintf("%v %+v", m.client, m.client)
 }

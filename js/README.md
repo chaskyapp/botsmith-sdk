@@ -8,7 +8,7 @@ of the public contract**, not documentation: half the traps this SDK exists to
 absorb are shape traps.
 
 One package ships from here, with two entrypoints: `@chasky/botsmith` (runtime,
-bot token) and `@chasky/botsmith/management` (human session + `X-Secret`).
+bot token) and `@chasky/botsmith/admin` (a developer key, `sk_...`).
 
 They share an artifact, not a design: separate constructors, separate error types,
 and the runtime never imports from the management subpath. See requirements R-A

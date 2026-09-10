@@ -4,7 +4,7 @@
   "contractVersion": "1.0",
   "guarantee": "M1",
   "title": "An unset optional field is omitted from the body, not sent as null",
-  "why": "The server's decoder rejects a null even where the field is optional, and each language defaults differently: Python serialises None as null, JavaScript keeps an explicit null, Go omits a nil pointer. Without this case the three SDKs would send three different bodies and two of them would get 400 INVALID_INPUT for a call the author wrote correctly.",
+  "why": "The server's decoder rejects a null even where the field is optional, and each language defaults differently: Python serialises None as null, JavaScript keeps an explicit null, Go omits a nil pointer. Without this case the three SDKs would send three different bodies and two of them would get 400 INVALID_INPUT for a call the author wrote correctly. The headers pin the OTHER half: exactly one credential leaves the client. The server answers 401 to a request carrying a developer key next to a session rather than choosing between them, so an SDK that helpfully attached both would turn a valid key into an anonymous rejection — and `Authorization: $absent` is the half that catches it, because a case that only checked the key present would pass either way.",
 
   "calls": [
     { "method": "command", "args": { "command": "/newbot", "expectedRevision": 0 } }
@@ -15,7 +15,11 @@
       "expect": {
         "method": "POST",
         "path": "/bot-management/commands",
-        "headers": { "Content-Type": "application/json" },
+        "headers": {
+          "Content-Type": "application/json",
+          "X-Chasky-Dev-Secret": "sk_test",
+          "Authorization": "$absent"
+        },
         "body": {
           "operationID": "$any",
           "expectedRevision": 0,

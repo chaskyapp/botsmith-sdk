@@ -36,7 +36,14 @@ class BrokenAdminClient implements AdminUnderTest {
     try {
       const response = await fetch(`${this.baseUrl}/bot-management${path}`, {
         method: "POST",
-        headers: { "content-type": "application/json", "X-Secret": "test-api-secret" },
+        // A propósito manda las DOS credenciales: es el error que m1 atrapa con
+        // `Authorization: $absent`, y esta fixture existe para comprobar que el
+        // runner lo detecta en vez de aprobarlo.
+        headers: {
+          "content-type": "application/json",
+          "X-Chasky-Dev-Secret": "sk_test",
+          Authorization: "Bearer session",
+        },
         body: JSON.stringify(body),
       });
       const envelope = (await response.json()) as { ok?: boolean; data?: unknown; error?: { code?: string } };

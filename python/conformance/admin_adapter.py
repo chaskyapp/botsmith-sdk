@@ -7,10 +7,9 @@ import json
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from chasky_botsmith_admin import as_platform_secret, CommandParams, AdminClient, AdminError, PageParams
+from chasky_botsmith_admin import as_developer_key, CommandParams, AdminClient, AdminError, PageParams
 
-TEST_API_SECRET = "test-api-secret"
-TEST_BEARER = "test-session-bearer"
+TEST_DEVELOPER_KEY = "sk_test"
 
 
 @dataclass(slots=True)
@@ -45,8 +44,7 @@ class SDKManagement:
         self.warnings: list[str] = []
         self._client = AdminClient(
             base_url=base_url,
-            api_secret=as_platform_secret(TEST_API_SECRET),
-            bearer_token=TEST_BEARER,
+            developer_key=as_developer_key(TEST_DEVELOPER_KEY),
         )
 
     async def invoke(self, method: str, args: dict[str, Any]) -> None:
