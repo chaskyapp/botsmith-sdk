@@ -117,6 +117,68 @@ conformance, publishes, and posts to Discord.
 - **Discord**: a repository secret `DISCORD_WEBHOOK`. Without it the notice is
   skipped and the release still publishes.
 
+## After publishing: conformance against the registry copy
+
+Everything above proves the **artifact** is well formed — the right files, the
+license in, no `.env`. It does not prove the **published code** still keeps the
+guarantees, because conformance normally runs against the working tree. Run it
+once more against what the registries actually serve.
+
+The trick is the same in all three languages: move the runner OUT of the repo and
+make it resolve the SDK from the registry. Every ecosystem silently prefers local
+code, so a run left inside the repo measures the working tree while reporting
+that it measured the release.
+
+```bash
+# Go — inside the module, the import resolves to local code no matter what.
+# A separate module is what forces the proxy copy.
+B=$(mktemp -d) && mkdir -p "$B/conformance" "$B/go"
+cp -R conformance/cases "$B/conformance/cases"
+cp -R go/conformance    "$B/go/conformance"
+cd "$B/go"
+printf 'module probe\n\ngo 1.23\n\nrequire github.com/chaskyapp/botsmith-sdk/go v0.1.0\n' > go.mod
+GOFLAGS=-mod=mod go mod tidy
+go list -m github.com/chaskyapp/botsmith-sdk/go        # must print v0.1.0
+go test ./conformance/ -count=1 -v | grep -c '^    --- PASS'
+```
+
+```bash
+# TypeScript — the adapter imports ../src/. Point it at the package instead.
+B=$(mktemp -d) && cp -R conformance "$B/conformance" && cp -R js "$B/js"
+cd "$B/js" && npm install @chasky/botsmith-sdk
+# in conformance/sdk-adapter.ts, replace the three ../src/*.js imports with:
+#   import { createBot, ChaskyApiError, polling, type Bot } from "@chasky/botsmith-sdk";
+grep -n '\.\./src/' conformance/sdk-adapter.ts       # must print nothing
+npx tsx conformance/run.ts
+```
+
+```bash
+# Python — the runner imports by module name, so the danger is sys.path: run it
+# from python/ and the local chasky_botsmith/ wins over the installed one.
+R=$PWD && B=$(mktemp -d) && mkdir -p "$B/python"
+cp -R conformance "$B/conformance"
+cp -R python/conformance "$B/python/conformance"
+cd "$B/python" && python3 -m venv .venv
+.venv/bin/pip install chasky-botsmith-sdk
+.venv/bin/pip install -e "$R/python/admin"            # not published yet
+.venv/bin/python -c "import chasky_botsmith; print(chasky_botsmith.__file__)"
+.venv/bin/python -m unittest conformance.test_conformance -v
+```
+
+**Check where the SDK came from before believing the result.** `go list -m` and
+`chasky_botsmith.__file__` are the evidence; a green run proves nothing about the
+release if the import quietly resolved to the repo.
+
+**Count the cases too.** Go prints `ok` for a package that ran zero cases, and
+unittest reports "3 tests" where there are 21 — it groups them. Count `--- PASS`
+lines, or load the cases and print `len`. Expect **21**.
+
+**Administration is only half covered** until the admin packages are published:
+in npm and PyPI the M cases run against the repo, since the runner needs a client
+that does not exist in the registry yet. Go is the exception — admin travels in
+the same module, so all 21 come from the proxy. Rerun this after the admin
+releases and all three are covered end to end.
+
 The sections below are the manual fallback, for when the workflow cannot run.
 
 ## License
