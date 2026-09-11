@@ -16,8 +16,6 @@
   "scripts": {
     "conformance": "tsx conformance/run.ts",
     "typecheck": "tsc --noEmit",
-    "smoke": "tsx scripts/smoke.ts",
-    "smoke:admin": "tsx scripts/smoke-admin.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run typecheck && npm run conformance && npm run build"
   },

@@ -46,10 +46,10 @@ use inside the package they install.
 bot runtime already uses. When that ships the admin client becomes an ordinary
 public package for third parties, and this split reopens on purpose.
 
-All three pass the same eleven cases. The order was TypeScript → Go → Python, for
+All three pass the same 21 cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
 single consumer**, and Go was the cheapest second port because the team already
-writes it and `pepibot` already existed.
+writes it.
 
 Each runner is shaped like its ecosystem — a CLI, `go test`, `unittest` — and each
 one carries a guard proving it can fail, because a runner that has never failed a
@@ -67,29 +67,6 @@ case is not a tested runner.
   into failing tests. They get written **before** any SDK, and every guarantee in
   the contract has at least one.
 
-## Smoke tests
-
-Each SDK has one, and they all read a single `.env` in this directory:
-
-```bash
-cp .env.example .env    # then fill in the token, never export it on a command line
-```
-
-| | Command |
-|---|---|
-| TypeScript | `cd js && npm run smoke` · `npm run smoke:admin` |
-| Go | `cd go && go run ./cmd/smoke` · `go run ./cmd/smoke-admin` |
-| Python | `cd python && .venv/bin/python smoke.py` · `smoke_admin.py` |
-
-The runtime smokes stand in for a **third-party bot author**: they use only what
-such an author has, a bot token. The admin smokes stand in for **a developer
-administering their own bots from their own code** — they authenticate with a
-developer key (`CHASKY_DEV_KEY`), which is exactly what such a developer has.
-
-The admin smokes are **read-only by default**. Their commands create bots, rotate
-credentials and reveal tokens against real data, so writes sit behind an explicit
-`--allow-writes`, and even that only sends `/help`.
-
 ## Running conformance
 
 | | Command |
@@ -102,11 +79,12 @@ credentials and reveal tokens against real data, so writes sit behind an explici
 so without it a changed case can report `ok (cached)` having run nothing.
 
 Conformance proves an SDK against a fake that answers what the cases declare.
-The smoke tests prove the other half: that the cases describe the **real**
-server. A case written from a misreading of the spec passes conformance and
-fails here.
+Whether the cases describe the **real** server is checked outside this
+repository, against a running instance: the library ships no examples and no
+smoke programs. A case written from a misreading of the spec passes conformance
+and fails there.
 
-**All three have been run against a live server (2026-09-09) and print the same
+**All three were run against a live server (2026-09-09) and printed the same
 wire shape** — same `chat.id` with its doubled `bot:` prefix intact, same types
 on every field, same reading of `date` as seconds. Only `update_id` and
 `message_id` differ, because they were different messages. Three independent

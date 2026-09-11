@@ -43,10 +43,8 @@ botsmith-sdk/
 │   └── core/                   Internal, NEVER published. See 00-spec.md §6.
 ├── go/                         .../botsmith-sdk/go (+ /management) · delivery 2
 │   └── internal/               Internal, not importable from outside.
-├── python/                     chasky_botsmith (+ .management)    · delivery 3
-│   └── _core/                  Internal by convention.
-└── reference/
-    └── pepibot/                Conformance client (D5)
+└── python/                     chasky_botsmith (+ .management)    · delivery 3
+    └── _core/                  Internal by convention.
 ```
 
 **A note on the name**: `BotSmith` names the **whole bot product**, which is why
@@ -258,8 +256,9 @@ languages.
 
 6. ~~Move `~/Desktop/pepibot/` into `reference/pepibot/` and translate its
    comments to English (D5).~~ **Done.** Copied rather than moved: the original on
-   the Desktop is the author's to delete. From here the repo copy is the one that
-   is maintained.
+   the Desktop is the author's to delete. **Undone on 2026-09-11:** examples and
+   reference clients do not ship with the library, so pepibot lives outside the
+   repository again and was removed from its history before the first push.
 7. ~~`botsmith-sdk/go`~~ **Done.**
 8. ~~Go conformance runner, against the same cases.~~ **Done**: 11/11, first run,
    with no case edited. `TestRunnerDetectsAMismatch` proves that runner checks.

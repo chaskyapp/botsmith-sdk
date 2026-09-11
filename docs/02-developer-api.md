@@ -127,20 +127,13 @@ plainly rather than hide:
 
 ## What is waiting on this
 
-The admin smokes — `js/scripts/smoke-admin.ts`, `go/cmd/smoke-admin`,
-`python/smoke_admin.py` — are written and have never met a real server. They are
-blocked here rather than merely unfinished: running them today would authenticate
-with the credential this proposal replaces, and would require writing the
-platform secret into a `.env` for a check that has to be repeated afterwards
-anyway.
+S6 is implemented server-side (chaskyapp/backend-api-go#527). What remains is a
+live run of the administration surface against a deployed instance, and it
+happens outside this repository, which ships no examples and no smoke programs.
 
-When this ships they need one change each — the header name and the environment
-variable. The calls they make, the wire shapes they print and the read-only
-default all stay as they are.
-
-That matters because the runtime's live smoke is what found `chat.id` carrying
-`bot:` twice, a shape six conformance cases would otherwise still be asserting
-wrongly. The admin cases have not had that test yet.
+That matters because a live run is what found `chat.id` carrying `bot:` twice, a
+shape six conformance cases would otherwise still be asserting wrongly. The admin
+cases have not had that test yet.
 
 ## Recorded as S6
 

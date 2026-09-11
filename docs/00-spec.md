@@ -410,9 +410,10 @@ differs from an SDK's: it is the only client that runs against **Chasky and
 Telegram at once**, and that comparison is what makes the differences in §4
 visible. A Chasky-native SDK loses exactly that capability.
 
-It lives in `reference/pepibot/` as the **conformance client**: the minimal
+It is the **conformance client** used while designing the contract: the minimal
 stdlib implementation that exercises the server contract end to end. The Go SDK
-is written looking at it, not derived from it (D5, §12).
+was written looking at it, not derived from it (D5, §12). It lives **outside this
+repository**: examples and reference clients do not ship with the library.
 
 ---
 
@@ -926,7 +927,7 @@ change is deliberate.
 | **D2** | Telegram-compatible or native? | **Native**, with Telegram's mental model | Ids are string vs number; every coercion is a silent error. §4 |
 | **D3** | Surface | **Two separate surfaces**; runtime first, management later | Incompatible envelopes and a `409` that means the opposite on each. *How* they are packaged is fixed by **D13**; separation is held by requirements R-A to R-D in §6 |
 | **D4** | Webhook | **Transport seam, no commitment to shape** | The server has not built it yet. §11 |
-| **D5** | pepibot's fate | **Conformance client** in `reference/pepibot/`, not the seed of `go/` | It is the only client running against both platforms, and a native SDK loses that. The actual move is a delivery-2 task |
+| **D5** | pepibot's fate | **Conformance client**, kept outside the repository and not the seed of `go/` | It is the only client running against both platforms, and a native SDK loses that. It lived in `reference/pepibot/` until 2026-09-11, when examples were taken out of the library |
 | **D6** | Deduplication by `update_id` | **Threshold `> lastSeen`**: one integer, no data structure | Verified against the code (below). Cheaper **and** more correct than a finite window |
 | **D7** | Offset persistence | **Optional** `OffsetStore` hook, in-memory default | A disk default surprises; an in-memory one reprocesses **visibly**. And the state is **a single integer** (below) |
 | **D8** | Non-loopback `http://` | **Warn once**, do not refuse; explicit opt-out | Refusing breaks legitimate internal staging — TLS terminated at the ingress, tunnels, compose |
@@ -1070,9 +1071,8 @@ These come out of this analysis and are `backend-api-go` tickets, not SDK work.
   **absent** header, not only a wrong one. Full proposal, including what the SDK
   should absorb, in [`02-developer-api.md`](02-developer-api.md).
 
-  **The admin smokes now wait for that deployment, not for a design.** They take a
-  single `CHASKY_DEV_KEY`; the platform secret no longer appears anywhere in
-  them.
+  **What remains is a live run against that deployment, not a design.** It happens
+  outside this repository, which ships no examples and no smoke programs.
 
 ---
 

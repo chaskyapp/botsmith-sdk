@@ -44,18 +44,6 @@ one well-maintained dependency.
 The conformance runner, by contrast, is **stdlib only** — its fake server is
 `http.server` on a thread — so checking the SDK installs nothing beyond `httpx`.
 
-## Smoke test against a real server
-
-```bash
-cp ../.env.example ../.env    # then fill in the token
-.venv/bin/python smoke.py
-```
-
-Conformance proves the SDK against a fake that answers what the cases declare.
-This proves the other half: that the cases describe the **real** server. It
-checks `get_me` — the one method no case exercises — and prints the wire shape
-of the first update once.
-
 ## Running conformance
 
 ```bash
