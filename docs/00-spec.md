@@ -131,6 +131,7 @@ GET  <base>/bot-management/capability
 GET  <base>/bot-management/bots
 GET  <base>/bot-management/bots/{id}
 GET  <base>/bot-management/dialogue
+GET  <base>/bot-management/developer-keys
 POST <base>/bot-management/commands
 PUT  <base>/bot-management/administrators/{id}
 ```
@@ -151,7 +152,39 @@ optimistic concurrency control. Body:
 `{operationID, expectedRevision, command, value?, botID?, expectedCredentialVersion?}`.
 Command vocabulary: `/newbot`, `/mybots`, `/help`, `/cancel`, `value`, `select`,
 `name`, `description`, `issue`, `rotate`, `revoke`, `archive`, `unarchive`,
-`confirm`.
+`publish`, `unpublish`, `webhook`, `unwebhook`, `/keys`, `newkey`, `revokekey`,
+`confirm`. (Until 2026-09-11 this list also lacked `publish`, `unpublish`,
+`webhook` and `unwebhook`, which the server already had.)
+
+#### Developer keys (server delta 22)
+
+A developer key is the credential a third party uses from their own code. It is
+issued, listed and revoked through the same dialogue, and the server keeps only
+its SHA-256 hash plus a publishable preview — `sk_` and six hex characters, 24
+of the secret's 256 bits — so that an owner can recognise a key they hold.
+
+- **Issue:** `/keys` → `newkey` → `value` (a label, up to 64 bytes, may be empty)
+  → `confirm`. The confirm answers `KEY_CREATED`, lands on step `keys`, and
+  carries **`data.developerKey` — `{value, ownerID, createdAt}` — exactly once.**
+  A replay of that confirm, same `operationID`, does not reveal it again and sets
+  `recoveryRequired: true`: the key exists and is unrecoverable, so the owner
+  revokes it and issues another.
+- **List:** `GET /developer-keys` answers a **list** — the first management
+  response whose `data` is not an object — of `{preview, label?, createdAt,
+  revokedAt?}`. Revoked keys are included, as the record that they existed. No
+  hash and no value, ever.
+- **Revoke:** `/keys` → `revokekey` → `value` (the preview; a whole key is also
+  accepted and trimmed to its preview) → `confirm`, answering `KEY_REVOKED`.
+  Revoking **seals** `revokedAt` instead of deleting, and the key stops working
+  on the very next request: resolution reads storage every time, with no cache.
+  A preview that is unknown, belongs to another owner or is already revoked ends
+  the operation **rejected, not pending**, and answers the same in all three
+  cases so that previews cannot be enumerated.
+- **Scope:** a key reaches only its owner's bots, and a foreign bot answers `404`,
+  not `403`. It opens nothing outside `/bot-management`. Logging out everywhere
+  or resetting the password does **not** kill keys: a key dies only by revocation.
+- `capability` announces `developerKeysEnabled`, so a client does not offer a
+  menu that always fails.
 
 ---
 
@@ -623,6 +656,27 @@ to read in full before writing a bot.
 - **G9 — Identifiers are re-emitted exactly as received.** The SDK never converts
   an id (§9).
 
+#### Administration (M1–M5)
+
+These existed only as labels inside the conformance cases until 2026-09-11. Each
+names the cases that verify it.
+
+- **M1 — An unset optional field is omitted, never sent as `null`.** The server's
+  decoder rejects a `null` even where the field is optional. (`m1`)
+- **M2 — An administration error keeps its meaning.** `409 STALE_STATE` is
+  retryable after re-reading, the opposite of the runtime's `409`; quota and rate
+  limits are not a loss of access. (`m2`, `m3`)
+- **M3 — A revealed credential reaches the caller once and stays nowhere else.**
+  A bot token in `data.secret` or a developer key in `data.developerKey` comes
+  back from the call itself, and never through an error, a warning or the
+  client's own representation. A decoder that lacks the field fails this too.
+  (`m4`, `m7`)
+- **M4 — `createBot` drives the whole dialogue and cleans up after itself.** Four
+  chained steps with revision chaining, and a `/cancel` when it fails half way.
+  (`m5`, `m6`)
+- **M5 — A listing reaches the caller with its values intact.** Asserted on
+  values, never field names, which are idiomatic per language. (`m8`)
+
 ### 8.2 Delegated — explicitly, and worth reading
 
 - **L1 — Exactly-once does not exist.** The server does not promise it and the
@@ -751,6 +805,13 @@ Implementing the rule:
    cannot leak the credential.
 4. The token never appears in the client's representation: `toString`, `inspect`,
    serialisation.
+
+**Administration credentials follow the same rule.** A developer key never
+appears in the admin client's representation, and revealed values — a bot token
+(`SecretReveal`) or a developer key (`DeveloperKeyReveal`) — print a redacted
+placeholder wherever the language has a representation hook: `String`/`GoString`
+in Go, `__repr__` in Python. The value is still reachable from the returned
+field, which is the one place it has to be (M3).
 
 **And one more rule pepibot does not cover:** if `baseUrl` is `http://` and the
 host is not loopback, the SDK **warns once at construction** (D8) — a token in
@@ -993,6 +1054,10 @@ These come out of this analysis and are `backend-api-go` tickets, not SDK work.
 - **S6 — A developer key for `/bot-management`.** *Not a papercut like S2–S5: it
   decides whether third parties can manage their own bots at all.*
 
+  **Status, 2026-09-11: implemented server-side** as BotSmith delta 22, in
+  chaskyapp/backend-api-go#527 — not yet merged or deployed. What the server
+  guarantees is described in §2.3.
+
   Mark the `/bot-management` group `IsPublic` so it skips the global `X-Secret`
   gate, and give the group its own middleware validating
   `x-chasky-dev-secret: sk_…`, scoped to the bots its owner owns. **The bot
@@ -1005,10 +1070,9 @@ These come out of this analysis and are `backend-api-go` tickets, not SDK work.
   **absent** header, not only a wrong one. Full proposal, including what the SDK
   should absorb, in [`02-developer-api.md`](02-developer-api.md).
 
-  **This blocks the admin smokes.** They are written and unverified against a
-  real server, and running them today would exercise a credential S6 replaces —
-  while requiring the platform secret in a `.env`, which is what three separate
-  guards in this repo exist to prevent.
+  **The admin smokes now wait for that deployment, not for a design.** They take a
+  single `CHASKY_DEV_KEY`; the platform secret no longer appears anywhere in
+  them.
 
 ---
 
