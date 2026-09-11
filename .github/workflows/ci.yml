@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# No step here uses `continue-on-error`. backend-api-go learned why: a job with
+# it reports green while its steps are red, and a broken tree went unnoticed for
+# a week. Independent steps use `if: always()` instead, so the first red step
+# does not hide the ones after it.
+
+jobs:
+  license:
+    name: License copies are identical
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Every registry packages only its own directory, so the license is copied
+      # into each one. A copy that drifts ships a different license than the repo.
+      - run: |
+          status=0
+          for d in js js/admin go python python/admin; do
+            cmp LICENSE "$d/LICENSE" || { echo "::error file=$d/LICENSE::differs from the root LICENSE"; status=1; }
+          done
+          exit $status
+
+  js:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            js/package-lock.json
+            js/admin/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Conformance
+        if: always()
+        run: npm run conformance
+      - name: Build runtime
+        if: always()
+        run: npm run build
+      - name: Build admin
+        if: always()
+        working-directory: js/admin
+        run: npm ci && npm run build
+      # RELEASING.md asks a person to read what would ship. The part a machine can
+      # check is checked here: the license is in, and no env file is.
+      - name: Inspect what would ship
+        if: always()
+        run: |
+          for dir in . admin; do
+            (cd "$dir" && npm pack --dry-run --json) > "/tmp/pack-${dir//\//_}.json"
+          done
+          node - <<'JS'
+            const fs = require("fs");
+            let failed = false;
+            for (const f of fs.readdirSync("/tmp").filter((n) => n.startsWith("pack-"))) {
+              const [pack] = JSON.parse(fs.readFileSync("/tmp/" + f, "utf8"));
+              const files = pack.files.map((x) => x.path);
+              if (!files.includes("LICENSE")) { console.log(`::error::${pack.name} would ship without LICENSE`); failed = true; }
+              const env = files.filter((p) => /(^|\/)\.env/.test(p));
+              if (env.length) { console.log(`::error::${pack.name} would ship ${env.join(", ")}`); failed = true; }
+              console.log(`${pack.name}: ${files.length} files`);
+            }
+            process.exit(failed ? 1 : 0);
+          JS
+
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        if: always()
+        run: go vet ./...
+      # -count=1 is not optional: Go's test cache does not hash the shared case
+      # files, so without it a changed case reports `ok (cached)` having run nothing.
+      - name: Test and conformance
+        if: always()
+        run: go test ./... -count=1
+
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # BOTH distributions: the conformance runner imports chasky_botsmith_admin
+      # too. Installing only python/ passes on a machine where admin happened to be
+      # installed before, and fails on a clean one.
+      - name: Install
+        run: pip install -e python -e python/admin build twine
+      - name: Conformance
+        working-directory: python
+        run: python -m unittest conformance.test_conformance -v
+      - name: Build and check both distributions
+        if: always()
+        run: |
+          python -m build python
+          python -m build python/admin
+          twine check python/dist/* python/admin/dist/*
+      - name: Inspect what would ship
+        if: always()
+        run: |
+          python - <<'PY'
+          import glob, sys, zipfile
+          failed = False
+          for wheel in glob.glob("python/dist/*.whl") + glob.glob("python/admin/dist/*.whl"):
+              names = zipfile.ZipFile(wheel).namelist()
+              if not any(n.endswith("LICENSE") for n in names):
+                  print(f"::error::{wheel} would ship without LICENSE"); failed = True
+              env = [n for n in names if "/.env" in n or n.startswith(".env")]
+              if env:
+                  print(f"::error::{wheel} would ship {env}"); failed = True
+              print(f"{wheel}: {len(names)} files")
+          sys.exit(1 if failed else 0)
+          PY
