@@ -10,12 +10,14 @@ T = TypeVar("T")
 CommandKind = Literal[
     "/newbot", "/mybots", "/help", "/cancel", "value", "select", "name",
     "description", "issue", "rotate", "revoke", "archive", "unarchive",
-    "publish", "unpublish", "webhook", "unwebhook", "confirm",
+    "publish", "unpublish", "webhook", "unwebhook", "/keys", "newkey", "revokekey",
+    "confirm",
 ]
 
 DialogueStep = Literal[
     "menu", "new_name", "new_username", "confirm_create", "select_bot",
-    "bot_menu", "edit_name", "edit_description", "webhook_url", "confirm_change",
+    "bot_menu", "edit_name", "edit_description", "webhook_url", "keys", "key_label",
+    "key_preview", "confirm_change",
 ]
 
 OperationState = Literal["pending", "completed", "rejected"]
@@ -48,6 +50,8 @@ class Capability:
     max_bots: int
     #: Announces the gate so a client does not offer a button that always fails.
     webhook_enabled: bool
+    #: Announces whether the server has developer keys wired, for the same reason.
+    developer_keys_enabled: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +70,8 @@ class Draft:
     action: str | None = None
     expected_metadata_version: int | None = None
     expected_credential_version: int | None = None
+    key_label: str | None = None
+    key_preview: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,9 +116,39 @@ class SecretReveal:
 
 
 @dataclass(frozen=True, slots=True)
+class DeveloperKeyReveal:
+    """Carries a live developer key.
+
+    It exists only in the response to the confirm that issued it — the server
+    keeps just its hash — so it is returned to the caller once and retained
+    nowhere else. ``__repr__`` is overridden so it cannot land in a log.
+    """
+
+    value: str
+    owner_id: str
+    created_at: str
+
+    def __repr__(self) -> str:
+        return "DeveloperKeyReveal(<developer key redacted>)"
+
+
+@dataclass(frozen=True, slots=True)
+class DeveloperKeyView:
+    """What a listing shows about a key: its publishable preview (sk_ + 6 hex),
+    never the hash or the value. Revoked keys are listed on purpose."""
+
+    preview: str
+    created_at: str
+    label: str | None = None
+    revoked_at: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class CommandResult:
     event: DialogueEvent
     secret: SecretReveal | None = None
+    #: Only on the confirm that issued a key: the one copy that will ever exist.
+    developer_key: DeveloperKeyReveal | None = None
     recovery_required: bool = False
 
     def __repr__(self) -> str:
@@ -135,6 +171,8 @@ def draft_from_wire(raw: dict[str, Any]) -> Draft:
         action=raw.get("action"),
         expected_metadata_version=raw.get("expectedMetadataVersion"),
         expected_credential_version=raw.get("expectedCredentialVersion"),
+        key_label=raw.get("keyLabel"),
+        key_preview=raw.get("keyPreview"),
     )
 
 

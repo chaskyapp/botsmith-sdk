@@ -47,6 +47,8 @@ export interface ManagementCall {
 export interface Assertions {
   /** Management: the id of the bot a facade call reports having created. */
   createdBotId?: string;
+  /** Management: each VALUE must appear in what the calls returned. */
+  resultContains?: string[];
   /** Management: the revealed token must come back from the call itself. */
   secretReturnedOnce?: string;
   /** Management: and appear in none of these places. */

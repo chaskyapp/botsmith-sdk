@@ -183,6 +183,16 @@ function checkManagementAssertions(testCase: ConformanceCase, client: AdminUnder
     }
   }
 
+  if (want.resultContains !== undefined) {
+    // Values, never field names: names are idiomatic per language.
+    const encoded = JSON.stringify(client.results);
+    for (const value of want.resultContains) {
+      if (!encoded.includes(value)) {
+        failures.push(failure("assert.resultContains", `the value ${JSON.stringify(value)} never reached the caller`));
+      }
+    }
+  }
+
   if (want.secretReturnedOnce !== undefined) {
     const returned = client.results.some((result) => JSON.stringify(result ?? null).includes(want.secretReturnedOnce!));
     if (!returned) {

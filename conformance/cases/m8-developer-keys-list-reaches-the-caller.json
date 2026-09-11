@@ -1,0 +1,54 @@
+{
+  "id": "m8-developer-keys-list-reaches-the-caller",
+  "kind": "management",
+  "contractVersion": "1.0",
+  "guarantee": "M5",
+  "title": "The developer-key listing reaches the caller with its values intact",
+  "why": "GET /bot-management/developer-keys is the first management response whose data is a LIST instead of an object. Code written for objects mishandles it quietly: a Python `data or {}` turns an empty list into a dict, a decoder aimed at the wrong type yields nothing, and the call still returns without an error. The owner then sees no keys — including a live one they need to revoke. The case asserts VALUES, never field names, because names are idiomatic per language: the preview, the label and the revocation date must all arrive.",
+  "calls": [
+    {
+      "method": "developerKeys",
+      "args": {}
+    }
+  ],
+  "exchanges": [
+    {
+      "expect": {
+        "method": "GET",
+        "path": "/bot-management/developer-keys"
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "data": [
+            {
+              "preview": "sk_a1b2c3",
+              "label": "ci-runner",
+              "createdAt": "2026-09-01T10:00:00Z"
+            },
+            {
+              "preview": "sk_d4e5f6",
+              "label": "old-laptop",
+              "createdAt": "2026-08-01T10:00:00Z",
+              "revokedAt": "2026-09-02T09:30:00Z"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "assert": {
+    "errorsReported": [],
+    "resultContains": [
+      "sk_a1b2c3",
+      "ci-runner",
+      "sk_d4e5f6",
+      "old-laptop",
+      "2026-09-02T09:30:00Z"
+    ]
+  },
+  "run": {
+    "timeoutMs": 3000
+  }
+}

@@ -31,6 +31,8 @@ export interface Capability {
   maxBots: number;
   /** Announces the gate so a client does not offer a button that always fails. */
   webhookEnabled: boolean;
+  /** Announces whether the server has developer keys wired, for the same reason. */
+  developerKeysEnabled: boolean;
 }
 
 export interface Page<T> {
@@ -49,6 +51,9 @@ export type DialogueStep =
   | "edit_name"
   | "edit_description"
   | "webhook_url"
+  | "keys"
+  | "key_label"
+  | "key_preview"
   | "confirm_change";
 
 export type OperationState = "pending" | "completed" | "rejected";
@@ -61,6 +66,8 @@ export interface Draft {
   action?: string;
   expectedMetadataVersion?: number;
   expectedCredentialVersion?: number;
+  keyLabel?: string;
+  keyPreview?: string;
 }
 
 export interface OperationReceipt {
@@ -95,9 +102,34 @@ export interface SecretReveal {
   version: number;
 }
 
+/**
+ * A live developer key. It exists only in the response to the confirm that
+ * issued it — the server keeps just its hash — so it is returned to the caller
+ * once and retained nowhere else.
+ */
+export interface DeveloperKeyReveal {
+  value: string;
+  ownerID: string;
+  createdAt: string;
+}
+
+/**
+ * What a listing shows about a key: its publishable preview (sk_ + 6 hex,
+ * enough to recognise it and to revoke it), never the hash or the value. A
+ * revoked key is listed on purpose, as the record that it existed.
+ */
+export interface DeveloperKeyView {
+  preview: string;
+  label?: string;
+  createdAt: string;
+  revokedAt?: string;
+}
+
 export interface CommandResult {
   event: DialogueEvent;
   secret?: SecretReveal;
+  /** Only on the confirm that issued a key. The one copy that will ever exist. */
+  developerKey?: DeveloperKeyReveal;
   recoveryRequired?: boolean;
 }
 
@@ -126,4 +158,7 @@ export type CommandKind =
   | "unpublish"
   | "webhook"
   | "unwebhook"
+  | "/keys"
+  | "newkey"
+  | "revokekey"
   | "confirm";

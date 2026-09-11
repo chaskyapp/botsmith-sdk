@@ -93,6 +93,8 @@ func (m *sdkManagement) call(ctx context.Context, method string, args map[string
 			Name:     str(args["name"]),
 			Username: str(args["username"]),
 		})
+	case "developerKeys":
+		return m.client.DeveloperKeys(ctx)
 	case "grant":
 		return m.client.Grant(ctx, str(args["targetId"]), admin.GrantParams{
 			Enabled:          args["enabled"] == true,
@@ -197,6 +199,18 @@ func checkManagementAssertions(c Case, client ManagementUnderTest) []Failure {
 				Where:  "assert.createdBotId",
 				Detail: fmt.Sprintf("expected the facade to report creating %s", want),
 			})
+		}
+	}
+
+	if len(c.Assert.ResultContains) > 0 {
+		encoded, _ := json.Marshal(client.Results())
+		for _, value := range c.Assert.ResultContains {
+			if !strings.Contains(string(encoded), value) {
+				failures = append(failures, Failure{
+					Where:  "assert.resultContains",
+					Detail: fmt.Sprintf("the value %q never reached the caller", value),
+				})
+			}
 		}
 	}
 

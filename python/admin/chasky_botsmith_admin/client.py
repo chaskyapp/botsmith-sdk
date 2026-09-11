@@ -9,6 +9,7 @@ from typing import Any, Callable
 import httpx
 
 from .errors import AdminError, AdminTransportError, DeveloperKey, code_for
+from .types import DeveloperKeyReveal, DeveloperKeyView
 from .types import (
     BotView,
     Capability,
@@ -100,6 +101,7 @@ class AdminClient:
             can_manage_administrators=data.get("canManageAdministrators", False),
             max_bots=data.get("maxBots", 0),
             webhook_enabled=data.get("webhookEnabled", False),
+            developer_keys_enabled=data.get("developerKeysEnabled", False),
         )
 
     async def bots(self, params: PageParams | None = None) -> Page[BotView]:
@@ -122,6 +124,27 @@ class AdminClient:
         )
         return event_from_wire(data.get("current") or {}), page
 
+    async def developer_keys(self) -> list[DeveloperKeyView]:
+        """The caller's developer keys, revoked ones included.
+
+        Each carries a publishable preview, never the hash or the value: the
+        value exists once, in the confirm that issued it.
+        """
+        data = await self._request("GET", "/developer-keys")
+        # The first management response whose data is a LIST. _request returns
+        # `data or {}`, which turns an empty list into a dict, so the type is
+        # checked here instead of trusted.
+        items = data if isinstance(data, list) else []
+        return [
+            DeveloperKeyView(
+                preview=item.get("preview", ""),
+                created_at=item.get("createdAt", ""),
+                label=item.get("label"),
+                revoked_at=item.get("revokedAt"),
+            )
+            for item in items
+        ]
+
     async def command(self, params: CommandParams) -> CommandResult:
         # Built key by key, and ONLY when set.
         #
@@ -143,6 +166,7 @@ class AdminClient:
 
         data = await self._request("POST", "/commands", body=body)
         secret = data.get("secret")
+        developer_key = data.get("developerKey")
         return CommandResult(
             event=event_from_wire(data.get("event") or {}),
             secret=SecretReveal(
@@ -151,6 +175,13 @@ class AdminClient:
                 version=secret.get("version", 0),
             )
             if secret
+            else None,
+            developer_key=DeveloperKeyReveal(
+                value=developer_key.get("value", ""),
+                owner_id=developer_key.get("ownerID", ""),
+                created_at=developer_key.get("createdAt", ""),
+            )
+            if developer_key
             else None,
             recovery_required=data.get("recoveryRequired", False),
         )

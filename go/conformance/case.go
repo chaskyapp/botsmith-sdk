@@ -56,7 +56,10 @@ type Assertions struct {
 	// appear in none of the listed places.
 	SecretReturnedOnce string   `json:"secretReturnedOnce"`
 	SecretNotIn        []string `json:"secretNotIn"`
-	ErrorsReported     []struct {
+	// ResultContains: each VALUE must appear in what the calls returned. Never a
+	// field name, which is idiomatic per language.
+	ResultContains []string `json:"resultContains"`
+	ErrorsReported []struct {
 		Code *int `json:"code"`
 		// Management codes are strings, not numbers.
 		ManagementCode string `json:"managementCode"`

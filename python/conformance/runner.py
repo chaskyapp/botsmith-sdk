@@ -199,6 +199,11 @@ def _check_management_assertions(case: dict[str, Any], client: ManagementUnderTe
                 Failure("assert.createdBotId", f"expected the facade to report creating {created}")
             )
 
+    # Values, never field names: names are idiomatic per language.
+    for value in want.get("resultContains", []):
+        if value not in encode(client.results):
+            failures.append(Failure("assert.resultContains", f"the value {value!r} never reached the caller"))
+
     secret = want.get("secretReturnedOnce")
     if secret:
         if secret not in encode(client.results):

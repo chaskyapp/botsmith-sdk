@@ -6,6 +6,7 @@ import type {
   Capability,
   CommandKind,
   CommandResult,
+  DeveloperKeyView,
   DialogueEvent,
   GrantView,
   Page,
@@ -95,6 +96,15 @@ export class AdminClient {
 
   dialogue(params: PageParams = {}, signal?: AbortSignal): Promise<Page<DialogueEvent> & { current: DialogueEvent }> {
     return this.request("GET", "/dialogue", undefined, params, signal);
+  }
+
+  /**
+   * The caller's developer keys, revoked ones included. Each carries a
+   * publishable preview, never the hash or the value: the value exists once,
+   * in the confirm that issued it.
+   */
+  developerKeys(signal?: AbortSignal): Promise<DeveloperKeyView[]> {
+    return this.request<DeveloperKeyView[]>("GET", "/developer-keys", undefined, undefined, signal);
   }
 
   command(params: CommandParams, signal?: AbortSignal): Promise<CommandResult> {

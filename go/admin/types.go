@@ -29,6 +29,9 @@ type Capability struct {
 	// WebhookEnabled announces the gate so a client does not offer a button
 	// that always fails.
 	WebhookEnabled bool `json:"webhookEnabled"`
+	// DeveloperKeysEnabled announces whether the server has developer keys
+	// wired, for the same reason.
+	DeveloperKeysEnabled bool `json:"developerKeysEnabled"`
 }
 
 type BotPage struct {
@@ -49,6 +52,9 @@ const (
 	StepEditName        Step = "edit_name"
 	StepEditDescription Step = "edit_description"
 	StepWebhookURL      Step = "webhook_url"
+	StepKeys            Step = "keys"
+	StepKeyLabel        Step = "key_label"
+	StepKeyPreview      Step = "key_preview"
 	StepConfirmChange   Step = "confirm_change"
 )
 
@@ -68,6 +74,8 @@ type Draft struct {
 	Action                    string `json:"action,omitempty"`
 	ExpectedMetadataVersion   *int64 `json:"expectedMetadataVersion,omitempty"`
 	ExpectedCredentialVersion *int64 `json:"expectedCredentialVersion,omitempty"`
+	KeyLabel                  string `json:"keyLabel,omitempty"`
+	KeyPreview                string `json:"keyPreview,omitempty"`
 }
 
 type Receipt struct {
@@ -108,10 +116,36 @@ type SecretReveal struct {
 func (SecretReveal) String() string   { return "[credential redacted]" }
 func (SecretReveal) GoString() string { return "[credential redacted]" }
 
+// DeveloperKeyReveal carries a live developer key, and exists only in the
+// response to the confirm that issued it: the server keeps just its hash. It is
+// returned to the caller and retained nowhere else, and String and GoString
+// are redacted so it cannot land in a log by accident.
+type DeveloperKeyReveal struct {
+	Value     string    `json:"value"`
+	OwnerID   string    `json:"ownerID"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+func (DeveloperKeyReveal) String() string   { return "[developer key redacted]" }
+func (DeveloperKeyReveal) GoString() string { return "[developer key redacted]" }
+
+// DeveloperKeyView is what a listing shows about a key: its publishable preview
+// (sk_ + 6 hex, enough to recognise it and to revoke it), never the hash or the
+// value. A revoked key is listed on purpose, as the record that it existed.
+type DeveloperKeyView struct {
+	Preview   string     `json:"preview"`
+	Label     string     `json:"label,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
+	RevokedAt *time.Time `json:"revokedAt,omitempty"`
+}
+
 type CommandResult struct {
-	Event            Event         `json:"event"`
-	Secret           *SecretReveal `json:"secret,omitempty"`
-	RecoveryRequired bool          `json:"recoveryRequired,omitempty"`
+	Event  Event         `json:"event"`
+	Secret *SecretReveal `json:"secret,omitempty"`
+	// DeveloperKey is only on the confirm that issued a key: the one copy that
+	// will ever exist. Without this field a typed decoder drops it in silence.
+	DeveloperKey     *DeveloperKeyReveal `json:"developerKey,omitempty"`
+	RecoveryRequired bool                `json:"recoveryRequired,omitempty"`
 }
 
 func (CommandResult) String() string   { return "[admin command result redacted]" }
@@ -144,5 +178,10 @@ const (
 	CommandUnpublish   CommandKind = "unpublish"
 	CommandWebhook     CommandKind = "webhook"
 	CommandUnwebhook   CommandKind = "unwebhook"
-	CommandConfirm     CommandKind = "confirm"
+	// The developer-key commands. revokekey is not revoke: that one revokes a
+	// BOT credential, and sharing a name would let a typo revoke the wrong thing.
+	CommandKeys      CommandKind = "/keys"
+	CommandNewKey    CommandKind = "newkey"
+	CommandRevokeKey CommandKind = "revokekey"
+	CommandConfirm   CommandKind = "confirm"
 )

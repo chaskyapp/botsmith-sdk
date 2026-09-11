@@ -42,6 +42,8 @@ class SdkAdminUnderTest implements AdminUnderTest {
         return this.client.command(args as never);
       case "createBot":
         return this.client.createBot(args as never);
+      case "developerKeys":
+        return this.client.developerKeys();
       case "grant":
         return this.client.grant(String(args["targetId"]), args as never);
       default:

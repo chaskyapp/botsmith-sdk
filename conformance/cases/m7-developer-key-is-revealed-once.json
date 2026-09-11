@@ -1,0 +1,65 @@
+{
+  "id": "m7-developer-key-is-revealed-once",
+  "kind": "management",
+  "contractVersion": "1.0",
+  "guarantee": "M3",
+  "title": "A newly issued developer key is returned to the caller and kept nowhere else",
+  "why": "Confirming a newkey is the one response that carries a live developer key, in data.developerKey.value. The server keeps only its hash, so this response is the only copy that will ever exist. If an SDK drops the field while decoding — what any typed decoder written before the field existed does, silently — the key is issued, counts as the owner's, and is unrecoverable: the only fix is to revoke it. If it leaks into an error, a warning or the client's own rendering, a credential that administers every bot its owner has lands in a log.",
+  "calls": [
+    {
+      "method": "command",
+      "args": {
+        "command": "confirm",
+        "expectedRevision": 12
+      }
+    }
+  ],
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot-management/commands",
+        "body": {
+          "command": "confirm",
+          "expectedRevision": 12,
+          "value": "$absent"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "data": {
+            "event": {
+              "revision": 14,
+              "step": "keys",
+              "draft": {},
+              "receipt": {
+                "operationID": "55555555-5555-4555-8555-555555555555",
+                "state": "completed"
+              },
+              "messageCode": "KEY_CREATED",
+              "createdAt": "2026-09-11T12:00:00Z"
+            },
+            "developerKey": {
+              "value": "sk_7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a",
+              "ownerID": "owner-1",
+              "createdAt": "2026-09-11T12:00:00Z"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "assert": {
+    "secretReturnedOnce": "sk_7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a7e3a",
+    "secretNotIn": [
+      "errors",
+      "warnings",
+      "repr"
+    ]
+  },
+  "run": {
+    "timeoutMs": 3000
+  }
+}

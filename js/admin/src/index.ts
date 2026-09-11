@@ -8,6 +8,8 @@ export type {
   Capability,
   CommandKind,
   CommandResult,
+  DeveloperKeyReveal,
+  DeveloperKeyView,
   DialogueEvent,
   DialogueStep,
   Draft,

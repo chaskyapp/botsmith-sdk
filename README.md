@@ -13,9 +13,9 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — 19/19 conformance |
-| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 19/19 conformance |
-| 3 | Python | `chasky-botsmith` | [`python/`](python/) — 19/19 conformance |
+| 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — 21/21 conformance |
+| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 21/21 conformance |
+| 3 | Python | `chasky-botsmith` | [`python/`](python/) — 21/21 conformance |
 
 ## Administration is a separate package, on purpose
 
@@ -63,7 +63,7 @@ case is not a tested runner.
 - **[docs/01-organization.md](docs/01-organization.md)** — how that contract
   survives three implementations without drifting: layout, what is invariant and
   what is idiomatic, conformance suite, versioning, work order.
-- **[conformance/](conformance/)** — 19 shared cases that turn the guarantees
+- **[conformance/](conformance/)** — 21 shared cases that turn the guarantees
   into failing tests. They get written **before** any SDK, and every guarantee in
   the contract has at least one.
 

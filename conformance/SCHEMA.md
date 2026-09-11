@@ -178,12 +178,12 @@ and waiting.
 ```
 
 - `calls[].method` is the client method: `capability`, `bots`, `bot`,
-  `dialogue`, `command`, `grant`.
+  `dialogue`, `command`, `createBot`, `developerKeys`, `grant`.
 - `calls[].args` are its named arguments, as the SDK exposes them.
 - `exchanges` and the matchers work exactly as above. `repeat`, `handlerRuns`
   and `botStopped` do not apply: nothing polls.
 
-Management adds four assertion fields:
+Management adds five assertion fields:
 
 | Field | Meaning |
 |---|---|
@@ -191,6 +191,7 @@ Management adds four assertion fields:
 | `errorsReported[].retryable` | whether re-reading and retrying is the right response |
 | `errorsReported[].accessLost` | whether this means administration was revoked |
 | `secretReturnedOnce` / `secretNotIn` | the revealed token reaches the return value and nowhere else |
+| `resultContains` | each string is a VALUE that must appear in what the calls returned. Never a field name: names are idiomatic per language |
 
 `retryable` and `accessLost` look like they break the rule against asserting
 anything idiomatic, and they would if a case named an error class. They do not:

@@ -88,6 +88,8 @@ class SDKManagement:
             return await self._client.create_bot(
                 CreateBotParams(name=str(args["name"]), username=str(args["username"]))
             )
+        if method == "developerKeys":
+            return await self._client.developer_keys()
         if method == "grant":
             return await self._client.grant(
                 str(args["targetId"]),

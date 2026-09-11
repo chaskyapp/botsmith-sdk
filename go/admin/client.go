@@ -138,6 +138,14 @@ type CommandParams struct {
 	OperationID string
 }
 
+// DeveloperKeys lists the caller's developer keys, revoked ones included. Each
+// carries a publishable preview, never the hash or the value.
+func (c *Client) DeveloperKeys(ctx context.Context) ([]DeveloperKeyView, error) {
+	var out []DeveloperKeyView
+	err := c.do(ctx, http.MethodGet, "/developer-keys", nil, Page{}, &out)
+	return out, err
+}
+
 func (c *Client) Command(ctx context.Context, p CommandParams) (CommandResult, error) {
 	operationID := p.OperationID
 	if operationID == "" {
