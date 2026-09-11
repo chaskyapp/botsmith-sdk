@@ -1,7 +1,6 @@
 {
   "name": "@chasky/botsmith",
   "version": "0.1.0",
-  "private": true,
   "description": "Client SDK for the Chasky Bot API",
   "type": "module",
   "engines": {
