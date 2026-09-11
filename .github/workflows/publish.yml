@@ -1,0 +1,173 @@
+name: Publish on Release
+
+# Same trigger as nexus: publishing a GitHub Release, not pushing a tag. A tag
+# pushed by mistake would otherwise publish, and a version published to npm or
+# PyPI cannot be withdrawn — only deprecated.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve the artifact from the tag
+    runs-on: ubuntu-latest
+    outputs:
+      artifact: ${{ steps.parse.outputs.artifact }}
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      # Five artifacts ship at different times, so the tag says which one this is.
+      - id: parse
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          case "$TAG" in
+            go/v*)           artifact=go ;;
+            js/v*)           artifact=js ;;
+            js-admin/v*)     artifact=js-admin ;;
+            python/v*)       artifact=python ;;
+            python-admin/v*) artifact=python-admin ;;
+            *) echo "::error::tag '$TAG' names no artifact. Use go/, js/, js-admin/, python/ or python-admin/ followed by vX.Y.Z"; exit 1 ;;
+          esac
+          version="${TAG#*/v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$version' is not a version"; exit 1
+          fi
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  go:
+    name: Go module
+    needs: resolve
+    if: needs.resolve.outputs.artifact == 'go'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      # There is nothing to build: the tag IS the release. Like nexus, ask the
+      # proxy for it so the module is fetched once and a wrong tag fails loudly.
+      # The proxy can lag a fresh tag by a little, hence the retries.
+      - name: Ask the Go proxy for the version
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if GOPROXY=proxy.golang.org go list -m "github.com/chaskyapp/botsmith-sdk/go@v${VERSION}"; then exit 0; fi
+            echo "attempt $attempt failed, retrying in 30s"; sleep 30
+          done
+          echo "::error::the Go proxy never resolved v${VERSION}. Is the tag go/v${VERSION} pushed?"; exit 1
+
+  npm:
+    name: npm package
+    needs: resolve
+    if: needs.resolve.outputs.artifact == 'js' || needs.resolve.outputs.artifact == 'js-admin'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DIR: ${{ needs.resolve.outputs.artifact == 'js' && 'js' || 'js/admin' }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+      # Only for the FIRST version: npm lets a trusted publisher be configured
+      # only on a package that already exists. Delete the secret afterwards and
+      # the trusted-publishing step below takes over.
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Trusted publishing needs a recent npm CLI; npm documents 11.5.1 or later.
+      - name: Update npm
+        run: npm install -g npm@latest
+      - name: The tag matches package.json
+        working-directory: ${{ env.DIR }}
+        run: |
+          actual=$(node -p "require('./package.json').version")
+          [ "$actual" = "$VERSION" ] || { echo "::error::the tag says $VERSION and package.json says $actual"; exit 1; }
+      # "private": true is the release safety catch, not a leftover. Automating
+      # the upload does not remove it: a person does, in a commit, on purpose.
+      - name: The package is no longer marked private
+        working-directory: ${{ env.DIR }}
+        run: |
+          if [ "$(node -p "Boolean(require('./package.json').private)")" = "true" ]; then
+            echo '::error::package.json still says "private": true. Removing it is the deliberate first step of a release.'; exit 1
+          fi
+      - name: Install
+        run: npm ci --prefix js && npm ci --prefix js/admin
+      # prepublishOnly runs typecheck, conformance and build for the runtime, and
+      # the build for admin, so a broken tree cannot reach the registry.
+      - name: Publish with the temporary token
+        if: env.HAS_NPM_TOKEN == 'true'
+        working-directory: ${{ env.DIR }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+          npm publish --access public --provenance
+      - name: Publish with trusted publishing
+        if: env.HAS_NPM_TOKEN != 'true'
+        working-directory: ${{ env.DIR }}
+        run: npm publish --access public
+
+  pypi:
+    name: PyPI distribution
+    needs: resolve
+    if: needs.resolve.outputs.artifact == 'python' || needs.resolve.outputs.artifact == 'python-admin'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DIR: ${{ needs.resolve.outputs.artifact == 'python' && 'python' || 'python/admin' }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: The tag matches pyproject.toml
+        run: |
+          actual=$(python -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb'))['project']['version'])" "$DIR/pyproject.toml")
+          [ "$actual" = "$VERSION" ] || { echo "::error::the tag says $VERSION and pyproject.toml says $actual"; exit 1; }
+      # PyPI has no prepublish hook, so conformance runs here explicitly.
+      - name: Conformance
+        run: |
+          pip install -e python -e python/admin build twine
+          cd python && python -m unittest conformance.test_conformance
+      - name: Build and check
+        run: |
+          python -m build "$DIR"
+          twine check "$DIR"/dist/*
+      # Trusted publishing: no token is stored anywhere. PyPI accepts a pending
+      # publisher for a project that does not exist yet, so this works from the
+      # first version on.
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ${{ env.DIR }}/dist
+
+  notify:
+    name: Discord
+    needs: [resolve, go, npm, pypi]
+    # Only after a successful publish. The jobs for the other artifacts are
+    # skipped, not failed, so they do not block this.
+    if: always() && needs.resolve.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+    steps:
+      # Same action as nexus. Without the secret the notice is skipped, and the
+      # release stays published: a missing webhook is not a failed release.
+      - name: Discord Notification
+        if: env.DISCORD_WEBHOOK != ''
+        uses: Ilshidur/action-discord@0.4.0
+        with:
+          args: |
+            🚀 New Release Published: **${{ github.event.release.tag_name }}**
+            Module: ${{ github.repository }}
+            Notes: ${{ github.event.release.body }}

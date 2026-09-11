@@ -21,8 +21,8 @@ None of these is code, and each one blocks a registry on its own:
   Nothing here needs an env file: the repo ships no examples or smoke programs.
 - **npm**: the publishing account is a member of the `chasky` organization. Check
   with `npm org ls chasky`; a 403 means it is not.
-- **PyPI**: an API token configured for `twine` on the publishing machine. Never
-  in this repo, never pasted into a chat.
+- **PyPI**: a trusted publisher per project (see *One-time setup* below). No token
+  is stored anywhere.
 
 ## Order
 
@@ -35,6 +35,50 @@ None of these is code, and each one blocks a registry on its own:
 3. **Go last of the first wave**: runtime and administration are ONE module, so
    `go/v0.1.0` would ship the admin package too. The Go tag waits for step 2's
    key management, even though the runtime half is ready earlier.
+
+## How a release happens
+
+Automated by `.github/workflows/publish.yml`, and triggered the way nexus is: by
+**publishing a GitHub Release**, not by pushing a tag. A tag pushed by mistake
+would otherwise publish, and a published version can only be deprecated.
+
+1. In a commit on `main`, set the version in the manifest. For an npm package,
+   also remove `"private": true` — deliberately, in that same commit. Wait for CI.
+2. Tag it with the artifact's prefix and push the tag:
+
+   ```bash
+   git tag js/v0.1.0 && git push origin js/v0.1.0
+   ```
+
+3. Publish a GitHub Release for that tag, with notes.
+
+The workflow then resolves which artifact the tag names, refuses to publish if
+the tag and the manifest disagree or the package is still marked private, runs
+conformance, publishes, and posts to Discord.
+
+| Tag | Publishes |
+|---|---|
+| `go/vX.Y.Z` | the Go module — asks the proxy to fetch it; there is nothing to build |
+| `js/vX.Y.Z` | `@chasky/botsmith` |
+| `js-admin/vX.Y.Z` | `@chasky/botsmith-admin` |
+| `python/vX.Y.Z` | `chasky-botsmith` |
+| `python-admin/vX.Y.Z` | `chasky-botsmith-admin` |
+
+### One-time setup
+
+- **PyPI**, for `chasky-botsmith` and for `chasky-botsmith-admin`: add a *pending*
+  trusted publisher — owner `chaskyapp`, repository `botsmith-sdk`, workflow
+  `publish.yml`, environment `pypi`. It works before the project exists.
+- **npm**, for each of the two packages: npm only lets a trusted publisher be
+  configured on a package that already exists. So the **first** version ships
+  with a repository secret `NPM_TOKEN` — a granular token, publish-only, short
+  expiry. Then, in the package's settings on npmjs.com, add a trusted publisher
+  (GitHub Actions, `chaskyapp/botsmith-sdk`, `publish.yml`, environment `npm`)
+  and **delete the secret**. From the next release on, no token exists.
+- **Discord**: a repository secret `DISCORD_WEBHOOK`. Without it the notice is
+  skipped and the release still publishes.
+
+The sections below are the manual fallback, for when the workflow cannot run.
 
 ## License
 
@@ -122,7 +166,9 @@ only way to keep the admin client out of what a bot author installs.
 Independent per language (D11), with the contract version declared separately.
 A packaging fix in Python does not force an empty release of TypeScript and Go.
 
-Tags: `js/v0.1.0`, `go/v0.1.0`, `python/v0.1.0`.
+Tags: `go/v0.1.0`, `js/v0.1.0`, `js-admin/v0.1.0`, `python/v0.1.0`,
+`python-admin/v0.1.0` — one prefix per artifact, because they ship at different
+times.
 
 ## The one thing to check by hand
 
