@@ -35,9 +35,12 @@ None of these is code, and each one blocks a registry on its own:
    `chasky-botsmith-sdk-admin` wait until the developer-key delta (server delta 22) is
    deployed and verified against a real instance, and the clients manage keys
    (issue, list, revoke) — not only authenticate with one.
-3. **Go last of the first wave**: runtime and administration are ONE module, so
-   `go/v0.1.0` would ship the admin package too. The Go tag waits for step 2's
-   key management, even though the runtime half is ready earlier.
+3. **Go ships both halves at once**: runtime and administration are ONE module,
+   so a Go tag carries the admin package whether or not step 2 has happened.
+   `go/v0.1.0` was tagged on 2026-09-11, before the server delta was deployed, so
+   `.../go/admin` is already public and calls endpoints a deployed server does not
+   answer yet. That is the cost of the module being the unit: from here on, a Go
+   tag is a decision about **both** surfaces.
 
 ## How a release happens
 
@@ -55,6 +58,17 @@ would otherwise publish, and a published version can only be deprecated.
 
 3. Publish a GitHub Release for that tag, with notes.
 
+**The tag must sit on a commit that already contains `publish.yml`.** A Release
+runs the workflow **as it exists in the tagged commit**, not as it exists on
+`main`. `go/v0.1.0` points at `1d4a0f7`, which predates the workflow, so
+publishing that Release triggered nothing at all — no failure, no run, no notice.
+The Go module reached the proxy anyway, because a Go tag *is* the publication.
+For npm and PyPI the same mistake means silence and no package.
+
+**Never move a tag that has already published.** The Go proxy caches a version
+permanently; retagging produces a module whose contents disagree with what the
+proxy serves. Cut a new version instead.
+
 The workflow then resolves which artifact the tag names, refuses to publish if
 the tag and the manifest disagree or the package is still marked private, runs
 conformance, publishes, and posts to Discord.
@@ -71,13 +85,35 @@ conformance, publishes, and posts to Discord.
 
 - **PyPI**, for `chasky-botsmith-sdk` and for `chasky-botsmith-sdk-admin`: add a *pending*
   trusted publisher — owner `chaskyapp`, repository `botsmith-sdk`, workflow
-  `publish.yml`, environment `pypi`. It works before the project exists.
+  `publish.yml`, environment `pypi`. It works before the project exists, which is
+  what npm cannot do. The project name is the distribution name as PyPI
+  normalises it: `chasky-botsmith-sdk`, the name in `pyproject.toml`, **not** the
+  import name. Check it appears under *Pending publishers* afterwards — a form
+  that was filled but not submitted fails at release time with
+  `invalid-publisher`, and the claims printed in that error are what GitHub sent,
+  not what PyPI has. A pending publisher does **not** reserve the name: until the
+  first version is up, anyone can take it.
 - **npm**, for each of the two packages: npm only lets a trusted publisher be
   configured on a package that already exists. So the **first** version ships
-  with a repository secret `NPM_TOKEN` — a granular token, publish-only, short
-  expiry. Then, in the package's settings on npmjs.com, add a trusted publisher
-  (GitHub Actions, `chaskyapp/botsmith-sdk`, `publish.yml`, environment `npm`)
-  and **delete the secret**. From the next release on, no token exists.
+  with a repository secret `NPM_TOKEN`, and the token has to be exactly right:
+  a granular token with **"Read and write (publish and stage)"** — *stage only*
+  cannot publish a version directly, it only stages one for a maintainer to
+  promote — and scoped to **`@chasky`**, not to selected packages, because the
+  package does not exist yet. Anything else fails as **404**, which reads like a
+  typo and is really a permission.
+
+  Then, in the package's settings on npmjs.com, add a trusted publisher (GitHub
+  Actions, `chaskyapp/botsmith-sdk`, `publish.yml`, environment `npm`) and tick
+  **Allow `npm publish`** under *Allowed actions*. Without that tick the publisher
+  can only stage, and this workflow runs `npm publish` — the next release would
+  fail on permissions again. The connection **cannot be edited afterwards**: to
+  change it, delete it and create it again.
+
+  Finally **delete the secret**, revoke the token, and set *Publishing access* to
+  *require 2FA and disallow bypass-2FA tokens*; trusted publishers keep working
+  under that setting. From the next release on, no token exists — which is the
+  point, since npm removes direct publishing with bypass-2FA tokens in January
+  2027.
 - **Discord**: a repository secret `DISCORD_WEBHOOK`. Without it the notice is
   skipped and the release still publishes.
 
@@ -166,8 +202,11 @@ only way to keep the admin client out of what a bot author installs.
 
 ## Versions
 
-Independent per language (D11), with the contract version declared separately.
-A packaging fix in Python does not force an empty release of TypeScript and Go.
+Independent per artifact (D11, D14), with the contract version declared
+separately. A packaging fix in Python does not force an empty release of
+TypeScript and Go, and a change to the admin surface does not force a release of
+the runtime. Go is the exception by construction: one module, one version for
+both surfaces.
 
 Tags: `go/v0.1.0`, `js/v0.1.0`, `js-admin/v0.1.0`, `python/v0.1.0`,
 `python-admin/v0.1.0` — one prefix per artifact, because they ship at different
