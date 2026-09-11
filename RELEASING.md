@@ -6,11 +6,11 @@ withdrawn, only deprecated.
 
 | Artifact | Registry | Directory |
 |---|---|---|
-| `@chasky/botsmith` | npm | `js/` |
-| `@chasky/botsmith-admin` | npm | `js/admin/` |
+| `@chasky/botsmith-sdk` | npm | `js/` |
+| `@chasky/botsmith-sdk-admin` | npm | `js/admin/` |
 | `github.com/chaskyapp/botsmith-sdk/go` | Go modules (a git tag) | `go/` |
-| `chasky-botsmith` | PyPI | `python/` |
-| `chasky-botsmith-admin` | PyPI | `python/admin/` |
+| `chasky-botsmith-sdk` | PyPI | `python/` |
+| `chasky-botsmith-sdk-admin` | PyPI | `python/admin/` |
 
 ## Prerequisites outside this repo
 
@@ -19,17 +19,20 @@ None of these is code, and each one blocks a registry on its own:
 - **GitHub**: `chaskyapp/botsmith-sdk` exists, is **public**, and this repo is pushed
   to it. The Go module path *is* that repo — without it there is nothing to tag.
   Nothing here needs an env file: the repo ships no examples or smoke programs.
-- **npm**: the publishing account is a member of the `chasky` organization. Check
-  with `npm org ls chasky`; a 403 means it is not.
+- **npm**: the token that publishes the first version belongs to a member of the
+  `chasky` organization and has read and write on the `@chasky` scope. npm hides a
+  write it refuses: the publish fails with **404 Not Found**, not 403. `npm org ls
+  chasky` does not settle it either way — it answers 403 to any token without
+  organization access, member or not.
 - **PyPI**: a trusted publisher per project (see *One-time setup* below). No token
   is stored anywhere.
 
 ## Order
 
-1. **Runtime first**: `@chasky/botsmith` (npm) and `chasky-botsmith` (PyPI). They
-   depend only on the Bot API and a bot token.
-2. **Administration after the server**: `@chasky/botsmith-admin` and
-   `chasky-botsmith-admin` wait until the developer-key delta (server delta 22) is
+1. **Runtime first**: `@chasky/botsmith-sdk` (npm) and `chasky-botsmith-sdk` (PyPI).
+   They depend only on the Bot API and a bot token.
+2. **Administration after the server**: `@chasky/botsmith-sdk-admin` and
+   `chasky-botsmith-sdk-admin` wait until the developer-key delta (server delta 22) is
    deployed and verified against a real instance, and the clients manage keys
    (issue, list, revoke) — not only authenticate with one.
 3. **Go last of the first wave**: runtime and administration are ONE module, so
@@ -59,14 +62,14 @@ conformance, publishes, and posts to Discord.
 | Tag | Publishes |
 |---|---|
 | `go/vX.Y.Z` | the Go module — asks the proxy to fetch it; there is nothing to build |
-| `js/vX.Y.Z` | `@chasky/botsmith` |
-| `js-admin/vX.Y.Z` | `@chasky/botsmith-admin` |
-| `python/vX.Y.Z` | `chasky-botsmith` |
-| `python-admin/vX.Y.Z` | `chasky-botsmith-admin` |
+| `js/vX.Y.Z` | `@chasky/botsmith-sdk` |
+| `js-admin/vX.Y.Z` | `@chasky/botsmith-sdk-admin` |
+| `python/vX.Y.Z` | `chasky-botsmith-sdk` |
+| `python-admin/vX.Y.Z` | `chasky-botsmith-sdk-admin` |
 
 ### One-time setup
 
-- **PyPI**, for `chasky-botsmith` and for `chasky-botsmith-admin`: add a *pending*
+- **PyPI**, for `chasky-botsmith-sdk` and for `chasky-botsmith-sdk-admin`: add a *pending*
   trusted publisher — owner `chaskyapp`, repository `botsmith-sdk`, workflow
   `publish.yml`, environment `pypi`. It works before the project exists.
 - **npm**, for each of the two packages: npm only lets a trusted publisher be

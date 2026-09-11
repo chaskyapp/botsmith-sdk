@@ -1,5 +1,5 @@
 /**
- * Binds @chasky/botsmith to the conformance runner.
+ * Binds @chasky/botsmith-sdk to the conformance runner.
  *
  * It lives here and not in src/ on purpose: it is test scaffolding, and the
  * publishable package must not carry it (R-C/R-D in §6 of the contract).

@@ -1,7 +1,7 @@
-# `@chasky/botsmith-admin`
+# `@chasky/botsmith-sdk-admin`
 
 **NOT FOR BOT AUTHORS.** If you are writing a bot, the package you want is
-[`@chasky/botsmith`](../README.md) next door.
+[`@chasky/botsmith-sdk`](../README.md) next door.
 
 This client carries a credential that ADMINISTERS bots: whoever holds it can
 create them, rotate their tokens and point their webhooks at another server. The
@@ -39,7 +39,7 @@ packages.
 ## Use
 
 ```ts
-import { AdminClient } from "@chasky/botsmith-admin";
+import { AdminClient } from "@chasky/botsmith-sdk-admin";
 
 const admin = new AdminClient({ baseUrl, developerKey: asDeveloperKey(process.env.CHASKY_DEV_KEY) });
 const { enabled } = await admin.capability();

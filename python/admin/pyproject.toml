@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "chasky-botsmith-admin"
+name = "chasky-botsmith-sdk-admin"
 version = "0.1.0"
 description = "BotSmith administration client. Authenticates with a developer key (sk_...) — NOT for bot authors."
 readme = "README.md"

@@ -419,28 +419,32 @@ repository**: examples and reference clients do not ship with the library.
 
 ## 6. Decision — minimal surface and packaging
 
-**CLOSED (D13): one publishable artifact per language, with two separate
-entrypoints.** The artifact is named after the product — BotSmith (D9) — and the
-two surfaces are subpaths.
+**CLOSED (D14): runtime and administration are separate packages in npm and
+PyPI, and a subpackage of the one module in Go.** It replaced D13, which had put
+both surfaces in one artifact per language as subpaths
+(`@chasky/botsmith/management`); §12 keeps the record of both.
 
-| | Runtime | Management |
+| | Runtime | Administration |
 |---|---|---|
-| npm | `@chasky/botsmith` | `@chasky/botsmith/management` |
-| Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/management` |
-| PyPI | `chasky_botsmith` | `chasky_botsmith.management` |
+| npm | `@chasky/botsmith-sdk` | `@chasky/botsmith-sdk-admin` |
+| Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/admin` |
+| PyPI | `chasky-botsmith-sdk` (imports `chasky_botsmith`) | `chasky-botsmith-sdk-admin` (imports `chasky_botsmith_admin`) |
 
-**Root entrypoint — the bot runtime (first delivery).** Credential: the token, in
-the path. Surface: `getMe`, `getUpdates`, `sendMessage`, `sendChatAction`, plus
-all the scaffolding in §7.
+**Runtime — the bot runtime (first delivery).** Credential: the token, in the
+path. Surface: `getMe`, `getUpdates`, `sendMessage`, `sendChatAction`, plus all
+the scaffolding in §7.
 
-**`/management` subpath — management (later, and only on demand).** Credential:
-**a developer key or a human session, exactly one**. Surface: the
-`/bot-management` endpoints.
+**Administration — later, and only on demand.** Credential: **a developer key or
+a human session, exactly one**. Surface: the `/bot-management` endpoints.
 
-Two advantages over publishing separate packages: the product's name **is** the
-package's name, and the three ecosystems come out symmetric. In Go, a module with
-a subpackage was already the natural shape; now npm and PyPI mirror it instead of
-each inventing its own.
+**Why apart, now that developer keys exist.** The first split was about the
+credential: before server delta 22 the admin surface needed the platform's own
+secret, and that had no place inside the package a bot author installs. Developer
+keys removed that reason. What remains is cadence: administration follows the
+server's deltas, while the runtime is stable, and in one artifact every change to
+the admin surface would force a release — or a major bump — of the package bot
+authors run 24/7. Go accepts that coupling because the module is its unit of
+versioning and a subpackage is the natural shape there.
 
 ### Why the two surfaces stay separate on the inside
 
@@ -491,19 +495,22 @@ puts two instances into the eviction war of §3.1. With distinct types, that `if
 does not compile against the wrong surface. The envelopes already differ, so
 separate types fall out of the contract rather than out of discipline.
 
-**R-C. The runtime imports nothing from the management subpath.** Verifiable with
+**R-C. The runtime imports nothing from administration.** Verifiable with
 a test, not a convention. That keeps management code out of the bundle for anyone
 who only runs a bot, and writes the dependency direction down.
 
-**R-D. What little they share lives in the internal module** (`core/`,
-`internal/`, `_core/`): token redaction, backoff, HTTP client. Never envelopes,
-never error types, never credentials. **If that module starts growing, it is a
-sign that something meant to stay separate is leaking.**
+**R-D. They share no code today, in any language; anything they ever share lives
+in an internal module** (`core/`, `internal/`, `_core/`): token redaction,
+backoff, HTTP client. Never envelopes, never error types, never credentials. **If
+that module appears and starts growing, it is a sign that something meant to stay
+separate is leaking.**
 
 ### Delivery order
 
-The runtime ships first and management later, even though they travel in the same
-artifact: the subpath can appear in a later version without breaking anyone.
+The runtime ships first and administration later. In npm and PyPI they are
+separate packages, so neither waits for the other. In Go the admin package travels
+in the same module, and it is already in `go/v0.1.0`, ahead of the server delta it
+calls.
 
 **Why BotSmith is not urgent:** almost every author creates the bot **once**, by
 hand, in the portal. Automating it serves one concrete case — CI provisioning
@@ -917,7 +924,7 @@ committing to it today would be inventing the server's contract from the client.
 
 ## 12. Decisions
 
-All thirteen are closed. They are applied, not re-litigated, unless new evidence
+All fourteen are closed. They are applied, not re-litigated, unless new evidence
 shows up — and when it does, the record says what the old reasoning was so the
 change is deliberate.
 
@@ -925,7 +932,7 @@ change is deliberate.
 |---|---|---|---|
 | **D1** | Languages and order | **TS → Go → Python**, all three | The second port is what validates conformance; Go is the cheapest second. §5 |
 | **D2** | Telegram-compatible or native? | **Native**, with Telegram's mental model | Ids are string vs number; every coercion is a silent error. §4 |
-| **D3** | Surface | **Two separate surfaces**; runtime first, management later | Incompatible envelopes and a `409` that means the opposite on each. *How* they are packaged is fixed by **D13**; separation is held by requirements R-A to R-D in §6 |
+| **D3** | Surface | **Two separate surfaces**; runtime first, management later | Incompatible envelopes and a `409` that means the opposite on each. *How* they are packaged is fixed by **D14**; separation is held by requirements R-A to R-D in §6 |
 | **D4** | Webhook | **Transport seam, no commitment to shape** | The server has not built it yet. §11 |
 | **D5** | pepibot's fate | **Conformance client**, kept outside the repository and not the seed of `go/` | It is the only client running against both platforms, and a native SDK loses that. It lived in `reference/pepibot/` until 2026-09-11, when examples were taken out of the library |
 | **D6** | Deduplication by `update_id` | **Threshold `> lastSeen`**: one integer, no data structure | Verified against the code (below). Cheaper **and** more correct than a finite window |
@@ -933,9 +940,10 @@ change is deliberate.
 | **D8** | Non-loopback `http://` | **Warn once**, do not refuse; explicit opt-out | Refusing breaks legitimate internal staging — TLS terminated at the ingress, tunnels, compose |
 | **D9** | Layout and names | **Monorepo `botsmith-sdk`** —BotSmith names the **whole bot product**, not just the manager— one directory per language at the root; npm scope **`@chasky/`** confirmed available | Three ports of one contract, same team, same time. Detail in `01-organization.md` |
 | **D10** | Conformance format | **JSON cases** + one HTTP fake per language | Idiomatic and process-free. **Reversible** (below) |
-| **D11** | Versioning | **Independent per language** + contract version declared separately | One artifact per language (D13), so semver is per language: a packaging fix in Python does not force empty releases in TS and Go. The question that matters —do they guarantee the same?— is answered by the contract version |
+| **D11** | Versioning | **Independent per artifact** (per language until D14) + contract version declared separately | Each artifact has its own semver (D14): a packaging fix in Python does not force empty releases in TS and Go, and an admin change does not force a runtime release. The question that matters —do they guarantee the same?— is answered by the contract version |
 | **D12** | Translate `docs/` to English | **Done on 2026-09-09.** Included renaming `01-organizacion.md` → `01-organization.md`, updating links, and dropping the *"(in Spanish for now)"* notices | It was tracked as a numbered decision rather than a loose TODO precisely so it would be counted among what was pending instead of evaporating |
-| **D13** | Packaging of the two surfaces | **One artifact per language, two entrypoints**: `@chasky/botsmith` and `@chasky/botsmith/management` | The artifact is named after the product (D9) and the three ecosystems come out symmetric. Supersedes D3 on the *how*; requirements R-A to R-D in §6 keep the real separation inside |
+| **D13** | Packaging of the two surfaces | **Superseded by D14.** Was: one artifact per language, two entrypoints, `@chasky/botsmith` and `@chasky/botsmith/management` | Was: the artifact is named after the product (D9) and the three ecosystems come out symmetric. The implementation split administration off anyway, because its credential was the platform's own secret |
+| **D14** | Packaging once developer keys exist (2026-09-11) | **Separate packages in npm and PyPI** —`@chasky/botsmith-sdk` and `@chasky/botsmith-sdk-admin`; `chasky-botsmith-sdk` and `chasky-botsmith-sdk-admin`— **and a subpackage in Go** (`go/admin`). Named before the first npm or PyPI release | Developer keys (server delta 22) removed the credential reason for the split, as `02-developer-api.md` anticipated. Kept apart for cadence: administration follows the server's deltas and the runtime does not. Supersedes D13; requirements R-A to R-D in §6 still hold |
 
 ### D6 verification (2026-09-08)
 
@@ -1011,8 +1019,9 @@ fakes start diverging, migrate to the single binary with the same cases.
 
 ### D11 — package version and contract version
 
-Each language publishes one artifact (D13) with its own semver: a packaging fix
-in Python does not force empty releases in TypeScript and Go.
+Each artifact carries its own semver (D14): a packaging fix in Python does not
+force empty releases in TypeScript and Go, and a change to the admin surface does
+not force a release of the runtime bot authors depend on.
 
 Separately, each artifact declares **which contract version** it satisfies, and
 conformance cases declare which version they belong to. That answers the one

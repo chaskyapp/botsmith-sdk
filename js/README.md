@@ -1,19 +1,19 @@
-# `@chasky/botsmith` — TypeScript SDK
+# `@chasky/botsmith-sdk` — TypeScript SDK
 
-**Delivery 1. Runtime implemented — 11/11 conformance. Not yet run against a
-real server, and `/management` does not exist yet.**
+**Delivery 1. Runtime implemented — 21/21 conformance, and run against a live
+server.**
 
 Written in TypeScript, publishing compiled JS plus `.d.ts`. The types are **part
 of the public contract**, not documentation: half the traps this SDK exists to
 absorb are shape traps.
 
-One package ships from here, with two entrypoints: `@chasky/botsmith` (runtime,
-bot token) and `@chasky/botsmith/admin` (a developer key, `sk_...`).
+One package ships from here: `@chasky/botsmith-sdk`, the bot runtime, which needs
+only a bot token. Administration — a developer key, `sk_...` — is a separate
+package, [`@chasky/botsmith-sdk-admin`](admin/README.md), published from
+[`admin/`](admin/) (D14 in §12 of the contract).
 
-They share an artifact, not a design: separate constructors, separate error types,
-and the runtime never imports from the management subpath. See requirements R-A
-through R-D in §6 of the contract. Whatever little they do share lives in `core/`,
-which is **internal and never published**.
+They share no code: separate constructors, separate error types, and neither
+imports from the other. See requirements R-A through R-D in §6 of the contract.
 
 ## Running conformance
 

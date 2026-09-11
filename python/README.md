@@ -1,4 +1,4 @@
-# `chasky-botsmith` — Python SDK
+# `chasky-botsmith-sdk` — Python SDK
 
 **Delivery 3.** Implemented; conformance runner in [`conformance/`](conformance/).
 

@@ -1,5 +1,5 @@
 {
-  "name": "@chasky/botsmith-admin",
+  "name": "@chasky/botsmith-sdk-admin",
   "version": "0.1.0",
   "private": true,
   "description": "BotSmith administration client. Authenticates with a developer key (sk_...) \u2014 NOT for bot authors.",

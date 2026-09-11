@@ -39,12 +39,11 @@ botsmith-sdk/
 ├── conformance/
 │   ├── README.md               How to run it and how to add a case.
 │   └── cases/                  Declarative cases. Executable source of truth.
-├── js/                         @chasky/botsmith (+ /management)   · delivery 1
-│   └── core/                   Internal, NEVER published. See 00-spec.md §6.
-├── go/                         .../botsmith-sdk/go (+ /management) · delivery 2
-│   └── internal/               Internal, not importable from outside.
-└── python/                     chasky_botsmith (+ .management)    · delivery 3
-    └── _core/                  Internal by convention.
+├── js/                         @chasky/botsmith-sdk               · delivery 1
+│   └── admin/                  @chasky/botsmith-sdk-admin
+├── go/                         .../botsmith-sdk/go (+ /admin)     · delivery 2
+└── python/                     chasky-botsmith-sdk                · delivery 3
+    └── admin/                  chasky-botsmith-sdk-admin
 ```
 
 **A note on the name**: `BotSmith` names the **whole bot product**, which is why
@@ -53,14 +52,14 @@ it names both the repo and the publishable artifact. In the server repo,
 the two senses coexist across repos and it is worth keeping in mind when jumping
 between them.
 
-Each language publishes **one** artifact with **two entrypoints** — runtime at the
-root, management under `/management` — and keeps what little they share in an
-**internal, unpublished** module. Sharing an artifact does not make them one
-thing: requirements R-A to R-D in §6 of the contract are what hold the real
-separation, and the reason is not tidiness — the envelopes are incompatible and
-`409` means the opposite on each surface. That internal module **must not expose
-one surface to the other**; if it starts growing, that is a sign something meant
-to stay separate is leaking.
+Runtime and administration ship as **separate packages** in npm and PyPI, and as
+a subpackage of the one module in Go (D14 in §12 of the contract). They share no
+code; if they ever do, it goes in an **internal, unpublished** module. Travelling
+together in Go does not make them one thing: requirements R-A to R-D in §6 of the
+contract are what hold the real separation, and the reason is not tidiness — the
+envelopes are incompatible and `409` means the opposite on each surface. Such an
+internal module **must not expose one surface to the other**; if it starts
+growing, that is a sign something meant to stay separate is leaking.
 
 **One directory per language at the root, not under `sdk/`.** The extra nesting
 buys nothing and makes Go's tags worse: `go/v0.1.0` is readable, `sdk/go/v0.1.0`
@@ -239,12 +238,12 @@ languages.
 
 ### Delivery 1 — TypeScript
 
-1. ~~Close the contract's decisions.~~ **Done**: all thirteen are resolved.
+1. ~~Close the contract's decisions.~~ **Done**: all fourteen are resolved.
 2. Write the conformance cases **before** the SDK. They come from §8 of the
    contract, not from the implementation.
 3. ~~TypeScript conformance runner.~~ **Done**, and validated: 2/11 against the
    naive fixture, so the suite is known to discriminate rather than rubber-stamp.
-4. ~~`@chasky/botsmith`: raw client, then runtime.~~ **Done**: 11/11 conformance.
+4. ~~`@chasky/botsmith-sdk`: raw client, then runtime.~~ **Done**: 11/11 conformance.
 5. ~~Run against a real local server, with pepibot's full flow.~~ **Done, and
    later repeated for Go and Python.** Conformance proves an SDK against a fake
    that answers what the cases declare; only a real server proves the cases

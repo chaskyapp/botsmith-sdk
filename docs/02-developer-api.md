@@ -86,11 +86,12 @@ So the middleware must be **fail-closed by construction**:
 
 ## What it does to the SDK
 
-`@chasky/botsmith-admin` **becomes a public package for third parties.** Its
+`@chasky/botsmith-sdk-admin` **becomes a public package for third parties.** Its
 credential stops being the platform's and starts being the developer's, so the
-reason it was split off disappears. D13 reopens on purpose: either it becomes an
-ordinary public package, or it folds back into `@chasky/botsmith` as a subpath,
-which is where D13 started.
+reason it was split off disappears. D13 reopened on purpose — either an ordinary
+public package, or folded back into the runtime as a subpath, which is where D13
+started — and closed as **D14**: it stays a separate package, because
+administration follows the server's deltas and the runtime does not.
 
 The guards change rather than vanish. `PlatformSecret` becomes `DeveloperKey`;
 `assertServerOnly()` **stays**, because an `sk_` must not reach a browser bundle

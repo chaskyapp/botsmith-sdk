@@ -46,9 +46,9 @@ export function asDeveloperKey(value: string): DeveloperKey {
 export class ServerOnlyError extends Error {
   constructor() {
     super(
-      "@chasky/botsmith-admin is server-only: it carries a developer key, which " +
+      "@chasky/botsmith-sdk-admin is server-only: it carries a developer key, which " +
         "administers your bots and must never reach a browser. If you need bot " +
-        "functionality in the client, that is @chasky/botsmith and a bot token.",
+        "functionality in the client, that is @chasky/botsmith-sdk and a bot token.",
     );
     this.name = "ServerOnlyError";
   }

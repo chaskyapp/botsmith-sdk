@@ -1,7 +1,7 @@
-# `chasky-botsmith-admin`
+# `chasky-botsmith-sdk-admin`
 
 **NOT FOR BOT AUTHORS.** If you are writing a bot, the package you want is
-[`chasky-botsmith`](../README.md) next door.
+[`chasky-botsmith-sdk`](../README.md) next door.
 
 This client carries a credential that ADMINISTERS bots: whoever holds it can
 create them, rotate their tokens and point their webhooks at another server. The

@@ -1,6 +1,6 @@
 # botsmith-sdk — Client SDKs for the Chasky Bot API
 
-**Status: specification. No code yet, in any language.**
+**Status: implemented in TypeScript, Go and Python — 21/21 conformance each.**
 
 Monorepo for the SDKs a bot author installs to talk to the Chasky Bot API —
 filling the role `telegraf` and `python-telegram-bot` fill for Telegram.
@@ -13,9 +13,9 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith` | [`js/`](js/) — 21/21 conformance |
+| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 21/21 conformance |
 | 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 21/21 conformance |
-| 3 | Python | `chasky-botsmith` | [`python/`](python/) — 21/21 conformance |
+| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 21/21 conformance |
 
 ## Administration is a separate package, on purpose
 
@@ -29,9 +29,9 @@ So the admin client is not part of the SDK a bot author installs:
 
 | | Bot author installs | Whoever administers bots installs |
 |---|---|---|
-| npm | `@chasky/botsmith` | `@chasky/botsmith-admin` |
+| npm | `@chasky/botsmith-sdk` | `@chasky/botsmith-sdk-admin` |
 | Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/admin` |
-| PyPI | `chasky-botsmith` | `chasky-botsmith-admin` |
+| PyPI | `chasky-botsmith-sdk` | `chasky-botsmith-sdk-admin` |
 
 A leaked bot token lets someone post as that one bot: bad, bounded, closed by
 rotating it. A leaked developer key administers every bot its owner has —
@@ -39,12 +39,14 @@ recoverable by revoking it, but not the same incident.
 Shipping both in one artifact would have put a surface its own audience cannot
 use inside the package they install.
 
-**This split is a consequence of the credential, not a permanent shape.**
-[`docs/02-developer-api.md`](docs/02-developer-api.md) proposes giving
-`/bot-management` its own middleware and a per-developer
-`x-chasky-dev-secret: sk_…` — the same `IsPublic`-plus-own-middleware pattern the
-bot runtime already uses. When that ships the admin client becomes an ordinary
-public package for third parties, and this split reopens on purpose.
+**The split outlived the reason it was made for.** It started as a consequence of
+the credential: before developer keys, `/bot-management` sat behind the platform's
+own secret. Server delta 22 gave every developer their own `sk_…` key, which
+reopened the question as [`docs/02-developer-api.md`](docs/02-developer-api.md)
+planned, and it closed with the packages still apart (D14 in §12 of the
+contract). What keeps them apart now is cadence: administration follows the
+server's deltas, the runtime does not, and a change in one should never force a
+release of the other.
 
 All three pass the same 21 cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
@@ -102,26 +104,16 @@ could not establish.
 3. **The token travels in the path** and leaks into logs through the transport.
    Every error leaving the SDK is redacted.
 
-## Before writing code
+## Decisions
 
-**All twelve decisions in §12 of the contract are resolved.** The last five closed
-on 2026-09-08. The only item left is executing D12 — translating `docs/` to
-English — which blocks no code.
+**All fourteen decisions in §12 of the contract are closed.** Worth knowing
+before reading it: deduplication and the poll offset are **the same single
+integer** (`offset == lastSeen + 1`), verified against the server code. The SDK
+keeps one number, not a data structure.
 
-Worth knowing before reading the contract: deduplication and the poll offset are
-**the same single integer** (`offset == lastSeen + 1`), verified against the
-server code. The SDK keeps one number, not a data structure.
-
-Each language ships **one artifact with two entrypoints** — the bot runtime at the
-root, management under `/management`:
-
-| | Runtime | Management |
-|---|---|---|
-| npm | `@chasky/botsmith` | `@chasky/botsmith/management` |
-| Go | `.../botsmith-sdk/go` | `.../botsmith-sdk/go/management` |
-| PyPI | `chasky_botsmith` | `chasky_botsmith.management` |
-
-Sharing an artifact does not make them one thing: they authenticate differently,
-use incompatible envelopes, and a `409` means the opposite on each. Requirements
-R-A through R-D in §6 of the contract are what keep them apart — separate
-constructors, separate error types, and no import from runtime into management.
+Runtime and administration are separate packages in npm and PyPI and a
+subpackage of the one module in Go (D14, table above). Even where they ship
+together they are not one thing: they authenticate differently, use incompatible
+envelopes, and a `409` means the opposite on each. Requirements R-A through R-D
+in §6 of the contract keep them apart — separate constructors, separate error
+types, and no import from runtime into administration.
