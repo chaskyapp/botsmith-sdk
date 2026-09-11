@@ -12,6 +12,40 @@ withdrawn, only deprecated.
 | `chasky-botsmith` | PyPI | `python/` |
 | `chasky-botsmith-admin` | PyPI | `python/admin/` |
 
+## Prerequisites outside this repo
+
+None of these is code, and each one blocks a registry on its own:
+
+- **GitHub**: `chaskyapp/botsmith-sdk` exists, is **public**, and this repo is pushed
+  to it. The Go module path *is* that repo — without it there is nothing to tag.
+  Fix `.env.example` before the first push: the repo is public from then on.
+- **npm**: the publishing account is a member of the `chasky` organization. Check
+  with `npm org ls chasky`; a 403 means it is not.
+- **PyPI**: an API token configured for `twine` on the publishing machine. Never
+  in this repo, never pasted into a chat.
+
+## Order
+
+1. **Runtime first**: `@chasky/botsmith` (npm) and `chasky-botsmith` (PyPI). They
+   depend only on the Bot API and a bot token.
+2. **Administration after the server**: `@chasky/botsmith-admin` and
+   `chasky-botsmith-admin` wait until the developer-key delta (server delta 22) is
+   deployed, the admin smokes pass against it, and the clients manage keys
+   (issue, list, revoke) — not only authenticate with one.
+3. **Go last of the first wave**: runtime and administration are ONE module, so
+   `go/v0.1.0` would ship the admin package too. The Go tag waits for step 2's
+   key management, even though the runtime half is ready earlier.
+
+## License
+
+Apache-2.0. The text is at the repo root and **copied into every artifact
+directory** (`js`, `js/admin`, `go`, `python`, `python/admin`), because each
+registry packages only its own directory. The copies must stay identical:
+
+```bash
+for d in js js/admin go python python/admin; do cmp LICENSE "$d/LICENSE" || echo "DIFFERS: $d"; done
+```
+
 ## Before anything
 
 Conformance is the gate. All three must be green, against the **shared** cases:

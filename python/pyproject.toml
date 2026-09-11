@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Client SDK for the Chasky Bot API"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 # httpx is the ONLY dependency, and it is not a default reached for lightly.
 # Go and Node ship async HTTP in their standard library; Python does not. The
 # alternative is urllib on a thread pool, and a 30-second long poll blocking a
@@ -21,7 +23,6 @@ dev = ["build>=1.2", "twine>=5.1"]
 Repository = "https://github.com/chaskyapp/botsmith-sdk"
 
 [tool.hatch.build.targets.wheel]
-# One distribution, two entrypoints: chasky_botsmith and
-# chasky_botsmith.management. Same shape as the npm subpath and the Go
-# subpackage — see D13 in the contract.
+# The bot runtime only. Administration ships as a separate distribution,
+# chasky-botsmith-admin, so a bot author never installs it by accident.
 packages = ["chasky_botsmith"]
