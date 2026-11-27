@@ -1,0 +1,85 @@
+{
+  "id": "g11-429-does-not-stop-the-bot",
+  "contractVersion": "1.0",
+  "guarantee": "G11",
+  "title": "A 429 while polling is a wait, never a stop",
+  "why": "The pair of g11-429-waits-retry-after-and-resends-same-key, and the mirror of g7-401-stops-the-bot at the same place. While polling, 401, 403 and 409 are terminal; a port that widens that to 'any 4xx' kills a bot whose only problem was going too fast, and nothing restarts it. The server does not rate-limit getUpdates today (it counts every other method), so this is a 429 from a limit added later or from anything in front of the API that speaks the envelope. Either way it says 'not yet', and the bot must keep polling after the time it was told, not sooner.",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "noop"
+    }
+  },
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 429,
+        "body": {
+          "ok": false,
+          "error_code": 429,
+          "description": "TOO_MANY_REQUESTS",
+          "parameters": {
+            "retry_after": 1
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "waitedAtLeastMs": 900,
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false,
+    "errorsReported": [
+      {
+        "code": 429,
+        "notContains": "{token}"
+      }
+    ]
+  },
+  "run": {
+    "timeoutMs": 5000
+  }
+}

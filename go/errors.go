@@ -3,6 +3,7 @@ package chaskybot
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 // APIError is a failure the server described in its envelope.
@@ -12,6 +13,9 @@ type APIError struct {
 	Code        int
 	Description string
 	Method      string
+	// RetryAfter is how long the server asked us to wait (G11). Zero when the
+	// envelope carried no usable parameters.retry_after.
+	RetryAfter time.Duration
 }
 
 func (e *APIError) Error() string {
@@ -62,7 +66,8 @@ func classify(err error, source errorSource) errorClass {
 	var api *APIError
 	if errors.As(err, &api) {
 		switch {
-		case api.Code >= 500:
+		// A 429 is "not yet", from any source: never terminal, never dropped (G11).
+		case api.Code >= 500 || api.Code == 429:
 			return classTransient
 		case source == sourcePoll && (api.Code == 401 || api.Code == 403 || api.Code == 409):
 			return classTerminal
@@ -77,4 +82,14 @@ func classify(err error, source errorSource) errorClass {
 		return classBusiness
 	}
 	return classTransient
+}
+
+// retryDelay is the backoff, or what the server asked for in a 429 if that is
+// longer. Waiting less only earns another 429 (G11).
+func retryDelay(err error, backoff time.Duration) time.Duration {
+	var api *APIError
+	if errors.As(err, &api) && api.RetryAfter > backoff {
+		return api.RetryAfter
+	}
+	return backoff
 }

@@ -178,7 +178,11 @@ class Client:
         if not isinstance(envelope, dict) or not envelope.get("ok"):
             code = (envelope or {}).get("error_code") or response.status_code
             description = (envelope or {}).get("description") or "UNKNOWN"
-            raise APIError(code, description, method)
+            parameters = (envelope or {}).get("parameters")
+            retry_after = parameters.get("retry_after") if isinstance(parameters, dict) else None
+            if isinstance(retry_after, bool) or not isinstance(retry_after, (int, float)):
+                retry_after = None
+            raise APIError(code, description, method, retry_after)
         return envelope.get("result")
 
 

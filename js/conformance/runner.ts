@@ -280,6 +280,13 @@ function checkRequests(testCase: ConformanceCase, server: FakeServer): Failure[]
       const reason = matchPartial(expected.body as Record<string, Json>, actual.body, captures, "body");
       if (reason) note(i + 1, reason);
     }
+    const previous = server.observed[i - 1];
+    if (expected.waitedAtLeastMs !== undefined && previous) {
+      const waited = actual.receivedAt - previous.receivedAt;
+      if (waited < expected.waitedAtLeastMs) {
+        note(i + 1, `arrived ${waited}ms after the previous request; the server asked for at least ${expected.waitedAtLeastMs}ms`);
+      }
+    }
   }
 
   const byDetail = new Map<string, number[]>();

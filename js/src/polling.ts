@@ -1,5 +1,5 @@
 import type { ChaskyBotClient } from "./client.js";
-import { classify } from "./errors.js";
+import { classify, retryDelayMs } from "./errors.js";
 import type { Update } from "./types.js";
 
 export interface TransportDeps {
@@ -74,7 +74,7 @@ async function runPollingLoop(options: PollingOptions, deps: TransportDeps): Pro
       }
       onError(error);
       consecutiveFailures++;
-      await sleep(backoffMs(consecutiveFailures, baseMs, maxMs), signal);
+      await sleep(retryDelayMs(error, backoffMs(consecutiveFailures, baseMs, maxMs)), signal);
       continue;
     }
 

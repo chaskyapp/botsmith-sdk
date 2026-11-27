@@ -84,7 +84,7 @@ func (p *poller) Run(ctx context.Context, deps TransportDeps) error {
 			}
 			deps.OnError(err)
 			failures++
-			if !sleepCtx(ctx, backoff(failures, base, maxDelay)) {
+			if !sleepCtx(ctx, retryDelay(err, backoff(failures, base, maxDelay))) {
 				return nil
 			}
 			continue

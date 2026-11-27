@@ -156,6 +156,13 @@ func checkRequests(c Case, fake *FakeServer) []Failure {
 				note(i+1, reason)
 			}
 		}
+		if expected.WaitedAtLeastMs != nil && i > 0 {
+			waited := actual.ReceivedAt.Sub(observed[i-1].ReceivedAt)
+			if want := time.Duration(*expected.WaitedAtLeastMs) * time.Millisecond; waited < want {
+				note(i+1, fmt.Sprintf("arrived %dms after the previous request; the server asked for at least %dms",
+					waited.Milliseconds(), want.Milliseconds()))
+			}
+		}
 		if len(expected.Body) > 0 {
 			if reason := matchPartial(expected.Body, actual.Body, captures, "body"); reason != "" {
 				note(i+1, reason)

@@ -64,6 +64,23 @@ class ConformanceTest(unittest.IsolatedAsyncioTestCase):
         )
 
 
+    async def test_runner_detects_a_resend_that_did_not_wait(self) -> None:
+        """Keeps waitedAtLeastMs honest: an unmeetable wait must fail a passing case."""
+        cases = {case["id"]: case for case in load_cases(CASES_DIR)}
+        target = cases.get("g11-429-does-not-stop-the-bot")
+        self.assertIsNotNone(target, "g11 is missing; this guard needs it")
+
+        # retry_after is 1s and the SDK waits about that; 60s is out of reach.
+        target["exchanges"][1]["expect"]["waitedAtLeastMs"] = 60000
+
+        failures = await run_case(target, factory)
+        self.assertTrue(
+            failures,
+            "the runner passed a request that came far sooner than waitedAtLeastMs; "
+            "it is not measuring arrival gaps",
+        )
+
+
     async def test_management_runner_detects_a_null_optional(self) -> None:
         """Keeps the management half honest.
 

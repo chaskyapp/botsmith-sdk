@@ -50,6 +50,7 @@ export class FakeServer {
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const raw = await readBody(req);
+    const receivedAt = Date.now();
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) {
       if (typeof v === "string") headers[k] = v;
@@ -60,6 +61,7 @@ export class FakeServer {
       path: req.url ?? "",
       headers,
       body: parseJson(raw),
+      receivedAt,
     };
 
     const last = this.exchanges[this.exchanges.length - 1];

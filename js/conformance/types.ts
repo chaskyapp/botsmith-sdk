@@ -11,6 +11,11 @@ export interface ExpectedRequest {
   query?: Record<string, Json>;
   body?: Record<string, Json>;
   headers?: Record<string, string>;
+  /**
+   * This request must arrive at least this many milliseconds after the
+   * previous one did. How a case says "you were told to wait" (G11).
+   */
+  waitedAtLeastMs?: number;
 }
 
 export interface CannedResponse {
@@ -101,6 +106,8 @@ export interface ObservedRequest {
   path: string;
   headers: Record<string, string>;
   body: Json;
+  /** When the fake received it, in milliseconds since the epoch. */
+  receivedAt: number;
 }
 
 export interface Failure {

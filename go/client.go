@@ -223,6 +223,9 @@ func (c *Client) call(ctx context.Context, method string, body any, headers map[
 		Result      json.RawMessage `json:"result"`
 		ErrorCode   int             `json:"error_code"`
 		Description string          `json:"description"`
+		Parameters  struct {
+			RetryAfter float64 `json:"retry_after"`
+		} `json:"parameters"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
 		return &TransportError{
@@ -239,7 +242,11 @@ func (c *Client) call(ctx context.Context, method string, body any, headers map[
 		if description == "" {
 			description = "UNKNOWN"
 		}
-		return &APIError{Code: code, Description: description, Method: method}
+		apiErr := &APIError{Code: code, Description: description, Method: method}
+		if envelope.Parameters.RetryAfter > 0 {
+			apiErr.RetryAfter = time.Duration(envelope.Parameters.RetryAfter * float64(time.Second))
+		}
+		return apiErr
 	}
 	if out == nil || len(envelope.Result) == 0 {
 		return nil

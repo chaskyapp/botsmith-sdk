@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 )
 
 type ExpectedRequest struct {
@@ -21,6 +22,9 @@ type ExpectedRequest struct {
 	Query   map[string]any    `json:"query"`
 	Body    map[string]any    `json:"body"`
 	Headers map[string]string `json:"headers"`
+	// WaitedAtLeastMs: this request must arrive at least this long after the
+	// previous one did, measured arrival to arrival (G11).
+	WaitedAtLeastMs *int `json:"waitedAtLeastMs"`
 }
 
 type CannedResponse struct {
@@ -115,6 +119,8 @@ type ObservedRequest struct {
 	Path    string
 	Headers map[string]string
 	Body    any
+	// ReceivedAt is when the fake read the request, for waitedAtLeastMs.
+	ReceivedAt time.Time
 }
 
 // LoadCases reads every case, sorted, so failures are reported in a stable
