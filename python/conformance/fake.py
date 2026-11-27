@@ -55,6 +55,14 @@ class FakeServer:
             def _handle(self) -> None:
                 length = int(self.headers.get("Content-Length") or 0)
                 raw = self.rfile.read(length) if length else b""
+                if len(raw) < length:
+                    # The client hung up mid-request: headers sent, body not.
+                    # It happens when the runner stops the bot while httpx is
+                    # writing a poll. No server would act on half a request, so
+                    # the fake does not either: recording it as an exchange with
+                    # a null body failed cases at random, under load.
+                    self.close_connection = True
+                    return
                 try:
                     body = json.loads(raw) if raw else None
                 except json.JSONDecodeError:
