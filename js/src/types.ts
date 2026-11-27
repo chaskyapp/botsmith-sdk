@@ -82,7 +82,7 @@ export interface WireWebhookInfo {
 /** The `{ok, result}` / `{ok:false, error_code, description}` envelope. */
 export type Envelope<T> =
   | { ok: true; result: T }
-  | { ok: false; error_code?: number; description?: string };
+  | { ok: false; error_code?: number; description?: string; parameters?: { retry_after?: number } };
 
 /** Wire shapes, before mapping. Never exported from the package root. */
 export interface WireBotMessage {

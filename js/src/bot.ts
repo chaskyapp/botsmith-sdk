@@ -1,5 +1,5 @@
 import { ChaskyBotClient, type ChaskyBotClientOptions } from "./client.js";
-import { ChaskyUsageError, classify } from "./errors.js";
+import { ChaskyUsageError, classify, retryDelayMs } from "./errors.js";
 import { polling, sleep, type Transport } from "./polling.js";
 import type { BotMessage, ChatID, MessageID, Update } from "./types.js";
 
@@ -156,7 +156,9 @@ async function sendWithRetry(
       if (classify(error, "call") !== "transient") throw error;
       if (attempt === options.attempts) break;
       options.onError(error);
-      await sleep(Math.round(250 * 2 ** (attempt - 1) * (0.5 + Math.random() * 0.5)), options.signal);
+      // A 429 says how long to wait (G11); the key above stays the same.
+      const backoff = Math.round(250 * 2 ** (attempt - 1) * (0.5 + Math.random() * 0.5));
+      await sleep(retryDelayMs(error, backoff), options.signal);
     }
   }
   throw lastError;

@@ -6,13 +6,16 @@ export class ChaskyApiError extends Error {
   /** Stable, human-readable, for logs. NEVER flow control — that is `code`. */
   readonly description: string;
   readonly method: string;
+  /** Seconds the server asked to wait. Only on a 429 (G11). */
+  readonly retryAfter: number | undefined;
 
-  constructor(code: number, description: string, method: string) {
+  constructor(code: number, description: string, method: string, retryAfter?: number) {
     super(`${method} failed: ${code} ${description}`);
     this.name = "ChaskyApiError";
     this.code = code;
     this.description = description;
     this.method = method;
+    this.retryAfter = typeof retryAfter === "number" && retryAfter > 0 ? retryAfter : undefined;
   }
 }
 
@@ -38,6 +41,15 @@ export class ChaskyUsageError extends Error {
 export type ErrorClass = "terminal" | "business" | "transient";
 
 /**
+ * How long to wait before retrying: the backoff, or what the server asked
+ * for in a 429 if that is longer. Waiting less only earns another 429.
+ */
+export function retryDelayMs(error: unknown, backoffMs: number): number {
+  const seconds = error instanceof ChaskyApiError ? error.retryAfter : undefined;
+  return seconds === undefined ? backoffMs : Math.max(backoffMs, seconds * 1000);
+}
+
+/**
  * Maps an error to what the SDK does with it (§10.2, G7).
  *
  * NOTE — a contract wrinkle resolved here. §10.2 classifies `403 BOT_SUSPENDED`
@@ -52,7 +64,8 @@ export type ErrorClass = "terminal" | "business" | "transient";
  */
 export function classify(error: unknown, source: "poll" | "call"): ErrorClass {
   if (error instanceof ChaskyApiError) {
-    if (error.code >= 500) return "transient";
+    // A 429 is "not yet", from any source: never terminal, never dropped (G11).
+    if (error.code >= 500 || error.code === 429) return "transient";
     if (source === "poll" && (error.code === 401 || error.code === 403 || error.code === 409)) {
       return "terminal";
     }

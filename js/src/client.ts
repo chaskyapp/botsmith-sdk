@@ -201,6 +201,7 @@ export class ChaskyBotClient {
         envelope.error_code ?? response.status,
         envelope.description ?? "UNKNOWN",
         method,
+        envelope.parameters?.retry_after,
       );
     }
     return envelope.result;
