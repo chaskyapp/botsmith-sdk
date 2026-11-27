@@ -10,7 +10,7 @@ from typing import Awaitable, Callable
 import httpx
 
 from .client import Client
-from .errors import UsageError, classify
+from .errors import UsageError, classify, retry_delay
 from .polling import Polling, Transport, TransportDeps, _backoff
 from .types import BotMessage, ChatID, MessageID, Update
 
@@ -187,7 +187,8 @@ async def _send_with_retry(
             if attempt == attempts:
                 break
             on_error(error)
-            await asyncio.sleep(_backoff(attempt, 0.25, 4.0))
+            # A 429 says how long to wait (G11); the key above stays the same.
+            await asyncio.sleep(retry_delay(error, _backoff(attempt, 0.25, 4.0)))
     assert last_error is not None
     raise last_error
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable, Protocol
 
 from .client import Client
-from .errors import classify
+from .errors import classify, retry_delay
 from .types import Update
 
 
@@ -83,7 +83,9 @@ class Polling:
                     raise
                 deps.on_error(error)
                 failures += 1
-                await asyncio.sleep(_backoff(failures, self._retry_base, self._retry_max))
+                await asyncio.sleep(
+                    retry_delay(error, _backoff(failures, self._retry_base, self._retry_max))
+                )
                 continue
 
             for update in batch:

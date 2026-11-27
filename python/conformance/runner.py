@@ -279,8 +279,8 @@ def _check_requests(case: dict[str, Any], fake: FakeServer) -> list[Failure]:
                     (index + 1, f"expected path {redact(want)}, got {redact(actual_path)}")
                 )
         if expected.get("query"):
-            observed = {k: v for k, v in parse_qsl(actual_query)}
-            reason = match_partial(expected["query"], observed, captures, "query")
+            actual_query_params = {k: v for k, v in parse_qsl(actual_query)}
+            reason = match_partial(expected["query"], actual_query_params, captures, "query")
             if reason:
                 problems.append((index + 1, reason))
         if expected.get("headers"):
@@ -291,6 +291,17 @@ def _check_requests(case: dict[str, Any], fake: FakeServer) -> list[Failure]:
             reason = match_partial(expected["body"], actual.body, captures, "body")
             if reason:
                 problems.append((index + 1, reason))
+        # Arrival to arrival, so a delayMs on the previous response counts.
+        if expected.get("waitedAtLeastMs") is not None and index > 0:
+            waited_ms = (actual.received_at - observed[index - 1].received_at) * 1000
+            if waited_ms < expected["waitedAtLeastMs"]:
+                problems.append(
+                    (
+                        index + 1,
+                        f"expected to wait at least {expected['waitedAtLeastMs']}ms after the "
+                        f"previous request, waited {waited_ms:.0f}ms",
+                    )
+                )
 
     grouped: dict[str, list[int]] = {}
     for index, detail in problems:

@@ -21,6 +21,8 @@ class ObservedRequest:
     path: str
     headers: dict[str, str]
     body: Any
+    #: time.monotonic() at arrival, for expect.waitedAtLeastMs.
+    received_at: float = 0.0
 
 
 @dataclass(slots=True)
@@ -57,11 +59,13 @@ class FakeServer:
                     body = json.loads(raw) if raw else None
                 except json.JSONDecodeError:
                     body = raw.decode("utf-8", "replace")
+                received_at = time.monotonic()
                 record = ObservedRequest(
                     method=self.command,
                     path=self.path,
                     headers={k: v for k, v in self.headers.items()},
                     body=body,
+                    received_at=received_at,
                 )
 
                 with state.lock:
