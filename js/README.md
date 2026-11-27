@@ -1,6 +1,6 @@
 # `@chasky/botsmith-sdk` — TypeScript SDK
 
-**Delivery 1. Runtime implemented — 21/21 conformance, and run against a live
+**Delivery 1. Runtime implemented — 23/23 conformance, and run against a live
 server.**
 
 Written in TypeScript, publishing compiled JS plus `.d.ts`. The types are **part

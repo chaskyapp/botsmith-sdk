@@ -1,6 +1,6 @@
 # botsmith-sdk — Client SDKs for the Chasky Bot API
 
-**Status: implemented in TypeScript, Go and Python — 21/21 conformance each.**
+**Status: implemented in TypeScript, Go and Python — 23/23 conformance each.**
 
 Monorepo for the SDKs a bot author installs to talk to the Chasky Bot API —
 filling the role `telegraf` and `python-telegram-bot` fill for Telegram.
@@ -13,9 +13,9 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 21/21 conformance |
-| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 21/21 conformance |
-| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 21/21 conformance |
+| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 23/23 conformance |
+| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 23/23 conformance |
+| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 23/23 conformance |
 
 ## Administration is a separate package, on purpose
 
@@ -48,7 +48,7 @@ contract). What keeps them apart now is cadence: administration follows the
 server's deltas, the runtime does not, and a change in one should never force a
 release of the other.
 
-All three pass the same 21 cases. The order was TypeScript → Go → Python, for
+All three pass the same 23 cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
 single consumer**, and Go was the cheapest second port because the team already
 writes it.
@@ -65,7 +65,7 @@ case is not a tested runner.
 - **[docs/01-organization.md](docs/01-organization.md)** — how that contract
   survives three implementations without drifting: layout, what is invariant and
   what is idiomatic, conformance suite, versioning, work order.
-- **[conformance/](conformance/)** — 21 shared cases that turn the guarantees
+- **[conformance/](conformance/)** — 23 shared cases that turn the guarantees
   into failing tests. They get written **before** any SDK, and every guarantee in
   the contract has at least one.
 
