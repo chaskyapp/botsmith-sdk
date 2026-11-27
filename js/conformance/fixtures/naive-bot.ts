@@ -4,8 +4,8 @@
  * This is what an author writes by hand after reading the endpoint list and
  * nothing else: advance the offset only on success, no deduplication, one
  * idempotency key reused forever, no redaction, no clamping, retry everything.
- * It was written against the 1:1 docs, so every update has a message and a 429
- * is just another failure.
+ * It was written against the 1:1 docs, so every update has a message, a 429 is
+ * just another failure and a mention is a field it never heard of.
  *
  * It exists so the runner can be trusted. A runner that has never failed a case
  * is not a tested runner — it might be reporting PASS because it checks nothing.

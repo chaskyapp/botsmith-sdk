@@ -122,11 +122,12 @@ function. The vocabulary is deliberately tiny; grow it only when a case needs it
 | `kind` | `"reply"` (answer every text), `"noop"` (consume, do not answer) |
 | `throwOnUpdateIds` | update ids on which the handler raises |
 | `replyText` | text to send; defaults to echoing the received text |
+| `mentionBack` | the reply mentions everyone the update mentioned, as `{name: user_id}`, and sends no `mentions` when the update had none (G12) |
 
 The handler sees **every** update, including kinds the SDK has no type for
 (G10): each adapter counts runs in the SDK's catch-all hook, not in its text
 handler, so `handlerRuns` reports updates that reached the author's code.
-`reply` only acts on updates that carry a message.
+`reply` and `mentionBack` only act on updates that carry a message.
 
 ## Driving the bot itself
 

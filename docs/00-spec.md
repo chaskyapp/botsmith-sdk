@@ -673,6 +673,9 @@ to read in full before writing a bot.
   least `parameters.retry_after` seconds, then resends the same message with the
   **same** `Idempotency-Key` (G4); a `429` while polling waits and keeps polling.
   It is not one of the poller's terminal codes. (`g11` pair)
+- **G12 — Mentions travel verbatim.** The `user_id` of each mention reaches the
+  author as the string that arrived, and a send carries `mentions` only when the
+  author gave some; never an empty or `null` field. (`g12`)
 
 #### Administration (M1–M5)
 
