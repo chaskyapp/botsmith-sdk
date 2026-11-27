@@ -202,7 +202,7 @@ func sendWithRetry(ctx context.Context, c *Client, p SendMessageParams, attempts
 		if onError != nil {
 			onError(err)
 		}
-		if !sleepCtx(ctx, backoff(attempt, 250*time.Millisecond, 4*time.Second)) {
+		if !sleepCtx(ctx, retryDelay(err, backoff(attempt, 250*time.Millisecond, 4*time.Second))) {
 			return nil, ctx.Err()
 		}
 	}

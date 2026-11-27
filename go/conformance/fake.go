@@ -60,6 +60,7 @@ func (f *FakeServer) Extras() []ObservedRequest {
 
 func (f *FakeServer) handle(w http.ResponseWriter, r *http.Request) {
 	raw, _ := io.ReadAll(r.Body)
+	receivedAt := time.Now()
 	headers := map[string]string{}
 	for name := range r.Header {
 		headers[name] = r.Header.Get(name)
@@ -70,7 +71,7 @@ func (f *FakeServer) handle(w http.ResponseWriter, r *http.Request) {
 			body = string(raw)
 		}
 	}
-	record := ObservedRequest{Method: r.Method, Path: r.URL.Path, Headers: headers, Body: body}
+	record := ObservedRequest{Method: r.Method, Path: r.URL.Path, Headers: headers, Body: body, ReceivedAt: receivedAt}
 
 	f.mu.Lock()
 	last := Exchange{}
