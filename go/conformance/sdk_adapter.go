@@ -45,11 +45,16 @@ func NewSDKBot(opts BotOptions) BotUnderTest {
 	}
 
 	spec := opts.Handler
+	// Counted in the catch-all hook, so an update kind the SDK has no type for
+	// is counted too (G10).
+	bot.HandleUpdate(func(ctx context.Context, u *chaskybot.Update) error {
+		s.mu.Lock()
+		s.runs[u.ID]++
+		s.mu.Unlock()
+		return nil
+	})
 	bot.Handle(func(ctx context.Context, e *chaskybot.Event) error {
 		id := e.Update.ID
-		s.mu.Lock()
-		s.runs[id]++
-		s.mu.Unlock()
 
 		for _, thrown := range spec.ThrowOnUpdateIds {
 			if thrown == id {

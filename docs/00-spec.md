@@ -663,6 +663,12 @@ to read in full before writing a bot.
   not wait up to 30 seconds for the server's deadline to expire.
 - **G9 — Identifiers are re-emitted exactly as received.** The SDK never converts
   an id (§9).
+- **G10 — What the SDK does not know still reaches the author.** An unknown
+  `chat.type`, an unknown update kind or an unknown field is passed through,
+  never rejected, dropped or turned into an error: the server adds them without
+  waiting for bots to update (group chats, `my_chat_member`, and files next).
+  Every update reaches the author's catch-all handler, with its raw form for the
+  kinds the SDK has no type for. (`g10`)
 - **G11 — A `429` is an instruction to wait, never a stop.** The SDK waits at
   least `parameters.retry_after` seconds, then resends the same message with the
   **same** `Idempotency-Key` (G4); a `429` while polling waits and keeps polling.

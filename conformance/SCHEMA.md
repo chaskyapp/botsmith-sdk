@@ -123,6 +123,11 @@ function. The vocabulary is deliberately tiny; grow it only when a case needs it
 | `throwOnUpdateIds` | update ids on which the handler raises |
 | `replyText` | text to send; defaults to echoing the received text |
 
+The handler sees **every** update, including kinds the SDK has no type for
+(G10): each adapter counts runs in the SDK's catch-all hook, not in its text
+handler, so `handlerRuns` reports updates that reached the author's code.
+`reply` only acts on updates that carry a message.
+
 ## Driving the bot itself
 
 Two guarantees are about the bot's own lifecycle rather than about what it sends,
@@ -144,7 +149,7 @@ Everything that is not an observed request.
 |---|---|
 | `botStopped` | whether the bot stopped on its own by the end of the run |
 | `handlerRuns` | `[{ "updateId": N, "times": M }]` — exact run counts |
-| `errorsReported` | `[{ "code": N, "notContains": "..." }]` — errors surfaced to the author |
+| `errorsReported` | `[{ "code": N, "notContains": "..." }]` — errors surfaced to the author. An explicit `[]` means none at all; an absent field says nothing |
 | `warnings` | `[{ "contains": "..." }]` — warnings emitted (G6, D8) |
 | `secondStartRejected` | the second `start()` failed locally, without a request (G1) |
 | `stoppedWithinMs` | `stop()` returned within this many milliseconds (G8) |

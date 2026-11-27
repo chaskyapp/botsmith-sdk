@@ -1,0 +1,183 @@
+{
+  "id": "g10-unknown-chat-and-update-types-reach-the-handler",
+  "contractVersion": "1.0",
+  "guarantee": "G10",
+  "title": "A chat type, an update type or a field the SDK does not know reaches the author without an error",
+  "why": "The server grows the update without asking the bots first: group chats arrived as chat.type \"group\" with title, is_bot, mentions and reply_to_message, then my_chat_member arrived as an update with no message at all, and files and reactions are next. A bot that was never updated must keep working through every one of those. An SDK that validates chat.type against what it knew, drops an update it cannot classify, or crashes reading update.message, turns each server release into an outage for every bot that did not ship in lockstep.",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply"
+    }
+  },
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-broadcast",
+                  "type": "channel",
+                  "title": "Avisos"
+                },
+                "date": 1795800089,
+                "text": "five"
+              }
+            },
+            {
+              "update_id": 6,
+              "message_reaction": {
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "message_id": "m4",
+                "reaction": "0x1F44D"
+              }
+            },
+            {
+              "update_id": 7,
+              "message": {
+                "message_id": "m7",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800090,
+                "text": "seven",
+                "attachments": [
+                  {
+                    "file_id": "f1",
+                    "kind": "document"
+                  }
+                ],
+                "attachments_truncated": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-broadcast",
+          "text": "five"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r5",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-broadcast",
+              "type": "channel",
+              "title": "Avisos"
+            },
+            "date": 1795800091,
+            "text": "five"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-group",
+          "text": "seven"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r7",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800092,
+            "text": "seven",
+            "edited_by": "a field no SDK knows yet"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 8
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false,
+    "handlerRuns": [
+      { "updateId": 5, "times": 1 },
+      { "updateId": 6, "times": 1 },
+      { "updateId": 7, "times": 1 }
+    ],
+    "errorsReported": []
+  },
+  "run": {
+    "timeoutMs": 3000
+  }
+}

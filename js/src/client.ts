@@ -3,6 +3,9 @@ import { redactError } from "./redact.js";
 import type {
   BotIdentity,
   BotMessage,
+  BotUser,
+  Chat,
+  ChatMemberState,
   ChatAction,
   ChatID,
   Envelope,
@@ -10,7 +13,10 @@ import type {
   Update,
   WebhookInfo,
   WireBotMessage,
+  WireChat,
+  WireMemberState,
   WireUpdate,
+  WireUser,
   WireWebhookInfo,
 } from "./types.js";
 
@@ -208,18 +214,51 @@ export class ChaskyBotClient {
   }
 }
 
+function toUser(raw: WireUser | undefined): BotUser {
+  const user: BotUser = { id: raw?.id ?? "", name: raw?.name ?? "" };
+  if (typeof raw?.is_bot === "boolean") user.isBot = raw.is_bot;
+  return user;
+}
+
+function toChat(raw: WireChat): Chat {
+  return raw.title === undefined ? { id: raw.id, type: raw.type } : { id: raw.id, type: raw.type, title: raw.title };
+}
+
 function toBotMessage(raw: WireBotMessage): BotMessage {
-  return {
+  const message: BotMessage = {
     messageId: raw.message_id,
-    from: { id: raw.from?.id ?? "", name: raw.from?.name ?? "" },
-    chat: { id: raw.chat.id, type: raw.chat.type },
+    from: toUser(raw.from),
+    chat: toChat(raw.chat),
     date: new Date((raw.date ?? 0) * 1000),
     text: raw.text ?? "",
   };
+  const reply = raw.reply_to_message;
+  if (reply) message.replyToMessage = { messageId: reply.message_id, from: toUser(reply.from), text: reply.text ?? "" };
+  return message;
 }
 
+function toMemberState(raw: WireMemberState | undefined): ChatMemberState {
+  const state: ChatMemberState = { status: raw?.status ?? "" };
+  if (raw?.read_mode) state.readMode = raw.read_mode;
+  if (raw?.history_mode) state.historyMode = raw.history_mode;
+  return state;
+}
+
+/** G10: a kind without a field here still becomes an Update, carrying `raw`. */
 function toUpdate(raw: WireUpdate): Update {
-  return raw.message ? { updateId: raw.update_id, message: toBotMessage(raw.message) } : { updateId: raw.update_id };
+  const update: Update = { updateId: raw.update_id, raw: raw as unknown as Record<string, unknown> };
+  if (raw.message) update.message = toBotMessage(raw.message);
+  const member = raw.my_chat_member;
+  if (member) {
+    update.myChatMember = {
+      chat: toChat(member.chat),
+      from: toUser(member.from),
+      date: new Date((member.date ?? 0) * 1000),
+      oldState: toMemberState(member.old_state),
+      newState: toMemberState(member.new_state),
+    };
+  }
+  return update;
 }
 
 /** Loopback only, deliberately excluding *.local — mDNS can be a real machine. */

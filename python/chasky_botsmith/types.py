@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
@@ -60,12 +60,27 @@ def webhook_info_from_wire(raw: dict[str, Any]) -> WebhookInfo:
 class User:
     id: UserID
     name: str
+    #: Sent in groups. None in a 1:1, where the sender is always a person.
+    is_bot: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class Chat:
     id: ChatID
+    #: "private" or "group" today. A plain str on purpose: a value this version
+    #: does not know must still decode (G10).
     type: str
+    #: Groups only.
+    title: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ReplyTo:
+    """The message a reply answers: just what the server embeds."""
+
+    message_id: MessageID
+    from_user: User
+    text: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,12 +91,37 @@ class BotMessage:
     #: The wire carries seconds since the epoch; this is timezone-aware UTC.
     date: datetime
     text: str
+    reply_to_message: ReplyTo | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChatMemberState:
+    """The bot's standing in a chat. ``status`` is free text, like Chat.type."""
+
+    status: str
+    read_mode: str | None = None
+    history_mode: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChatMemberUpdated:
+    """The bot was added to a chat, had its modes changed, or left (G10)."""
+
+    chat: Chat
+    from_user: User
+    date: datetime
+    old_state: ChatMemberState
+    new_state: ChatMemberState
 
 
 @dataclass(frozen=True, slots=True)
 class Update:
     update_id: UpdateID
     message: BotMessage | None = None
+    my_chat_member: ChatMemberUpdated | None = None
+    #: The update exactly as received, so a kind this version has no field for
+    #: is still readable (G10).
+    raw: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,20 +134,69 @@ class BotIdentity:
     display_name: str
 
 
+def _user(raw: dict[str, Any] | None) -> User:
+    raw = raw or {}
+    is_bot = raw.get("is_bot")
+    return User(
+        id=raw.get("id", ""),
+        name=raw.get("name", ""),
+        is_bot=is_bot if isinstance(is_bot, bool) else None,
+    )
+
+
+def _chat(raw: dict[str, Any]) -> Chat:
+    return Chat(id=raw["id"], type=raw.get("type", ""), title=raw.get("title"))
+
+
+def _state(raw: dict[str, Any] | None) -> ChatMemberState:
+    raw = raw or {}
+    return ChatMemberState(
+        status=raw.get("status", ""),
+        read_mode=raw.get("read_mode") or None,
+        history_mode=raw.get("history_mode") or None,
+    )
+
+
+def _date(raw: dict[str, Any]) -> datetime:
+    return datetime.fromtimestamp(raw.get("date", 0), tz=timezone.utc)
+
+
 def message_from_wire(raw: dict[str, Any]) -> BotMessage:
-    sender = raw.get("from") or {}
+    reply = raw.get("reply_to_message")
     return BotMessage(
         message_id=raw.get("message_id", ""),
-        from_user=User(id=sender.get("id", ""), name=sender.get("name", "")),
-        chat=Chat(id=raw["chat"]["id"], type=raw["chat"].get("type", "")),
-        date=datetime.fromtimestamp(raw.get("date", 0), tz=timezone.utc),
+        from_user=_user(raw.get("from")),
+        chat=_chat(raw["chat"]),
+        date=_date(raw),
         text=raw.get("text", ""),
+        reply_to_message=(
+            ReplyTo(
+                message_id=reply.get("message_id", ""),
+                from_user=_user(reply.get("from")),
+                text=reply.get("text", ""),
+            )
+            if reply
+            else None
+        ),
     )
 
 
 def update_from_wire(raw: dict[str, Any]) -> Update:
     message = raw.get("message")
+    member = raw.get("my_chat_member")
     return Update(
         update_id=raw["update_id"],
         message=message_from_wire(message) if message else None,
+        my_chat_member=(
+            ChatMemberUpdated(
+                chat=_chat(member["chat"]),
+                from_user=_user(member.get("from")),
+                date=_date(member),
+                old_state=_state(member.get("old_state")),
+                new_state=_state(member.get("new_state")),
+            )
+            if member
+            else None
+        ),
+        raw=raw,
     )

@@ -56,11 +56,12 @@ type Bot struct {
 	transport Transport
 	attempts  int
 
-	mu       sync.Mutex
-	running  bool
-	commands map[string]Handler
-	handlers []Handler
-	onErrors []func(error)
+	mu             sync.Mutex
+	running        bool
+	commands       map[string]Handler
+	handlers       []Handler
+	updateHandlers []func(ctx context.Context, u *Update) error
+	onErrors       []func(error)
 }
 
 func New(opts BotOptions) (*Bot, error) {
@@ -93,6 +94,16 @@ func (b *Bot) Handle(h Handler) *Bot {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.handlers = append(b.handlers, h)
+	return b
+}
+
+// HandleUpdate registers a hook that runs for EVERY update, before command and
+// text dispatch, including kinds this version has no type for (G10). It is the
+// place to read Update.MyChatMember or Update.Raw.
+func (b *Bot) HandleUpdate(h func(ctx context.Context, u *Update) error) *Bot {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.updateHandlers = append(b.updateHandlers, h)
 	return b
 }
 
@@ -141,6 +152,14 @@ func (b *Bot) emitError(err error) {
 }
 
 func (b *Bot) dispatch(ctx context.Context, update Update) error {
+	b.mu.Lock()
+	hooks := append([]func(context.Context, *Update) error{}, b.updateHandlers...)
+	b.mu.Unlock()
+	for _, hook := range hooks {
+		if err := hook(ctx, &update); err != nil {
+			return err
+		}
+	}
 	if update.Message == nil {
 		return nil
 	}

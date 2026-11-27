@@ -34,9 +34,13 @@ class SdkBotUnderTest implements BotUnderTest {
       allowInsecureTransport: true, // the fake server is plain http on loopback
     });
 
+    // Counted in the catch-all hook, so an update kind the SDK has no type for
+    // is counted too (G10).
+    this.bot.on("update", (update) => {
+      this.handlerRuns.set(update.updateId, (this.handlerRuns.get(update.updateId) ?? 0) + 1);
+    });
     this.bot.on("text", async (ctx) => {
       const id = ctx.update.updateId;
-      this.handlerRuns.set(id, (this.handlerRuns.get(id) ?? 0) + 1);
       if (spec.throwOnUpdateIds?.includes(id)) throw new Error(`handler failed on update ${id}`);
       if (spec.kind === "noop") return;
       await ctx.reply(spec.replyText ?? ctx.message.text);

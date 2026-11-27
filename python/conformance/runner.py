@@ -405,6 +405,12 @@ def _check_assertions(
                     )
                 )
 
+    # An explicit empty list means "none at all"; an absent one says nothing.
+    if want.get("errorsReported") == [] and bot.errors:
+        failures.append(
+            Failure("assert.errorsReported", f"expected no errors, got {[e.message for e in bot.errors]}")
+        )
+
     for warning in want.get("warnings", []):
         if not any(warning["contains"].lower() in w.lower() for w in bot.warnings):
             failures.append(

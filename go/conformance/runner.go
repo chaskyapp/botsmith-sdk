@@ -281,6 +281,18 @@ func checkAssertions(c Case, bot BotUnderTest, secondStartRejected bool, stopDur
 		}
 	}
 
+	// An explicit empty list means "none at all"; an absent one says nothing.
+	if c.Assert.ErrorsReported != nil && len(c.Assert.ErrorsReported) == 0 && len(errs) > 0 {
+		messages := make([]string, 0, len(errs))
+		for _, e := range errs {
+			messages = append(messages, e.Message)
+		}
+		failures = append(failures, Failure{
+			Where:  "assert.errorsReported",
+			Detail: fmt.Sprintf("expected no errors, got %q", messages),
+		})
+	}
+
 	warnings := bot.Warnings()
 	for _, want := range c.Assert.Warnings {
 		found := false

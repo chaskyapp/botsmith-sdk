@@ -30,7 +30,7 @@ client gets wrong:
   exception this package raises has been redacted first.
 """
 
-from .bot import Bot, Event, Handler
+from .bot import Bot, Event, Handler, UpdateHandler
 from .client import (
     DEFAULT_BASE_URL,
     MAX_LIMIT,
@@ -44,6 +44,9 @@ from .types import (
     BotMessage,
     Chat,
     ChatAction,
+    ChatMemberState,
+    ChatMemberUpdated,
+    ReplyTo,
     Update,
     User,
     WebhookInfo,
@@ -57,6 +60,8 @@ __all__ = [
     "ChaskyError",
     "Chat",
     "ChatAction",
+    "ChatMemberState",
+    "ChatMemberUpdated",
     "Client",
     "DEFAULT_BASE_URL",
     "Event",
@@ -64,9 +69,11 @@ __all__ = [
     "MAX_LIMIT",
     "MAX_TIMEOUT_SECONDS",
     "Polling",
+    "ReplyTo",
     "Transport",
     "TransportError",
     "Update",
+    "UpdateHandler",
     "UsageError",
     "User",
     "WebhookInfo",
