@@ -68,7 +68,17 @@ func NewSDKBot(opts BotOptions) BotUnderTest {
 		if text == "" {
 			text = e.Message.Text
 		}
-		_, err := e.Reply(ctx, text)
+		var opts chaskybot.ReplyOptions
+		if spec.MentionBack {
+			// Nil when the message mentioned no one: the field must not be sent.
+			for _, m := range e.Message.Mentions {
+				if opts.Mentions == nil {
+					opts.Mentions = map[string]string{}
+				}
+				opts.Mentions[m.Name] = m.UserID
+			}
+		}
+		_, err := e.ReplyWith(ctx, text, opts)
 		return err
 	})
 	bot.OnError(s.recordError)

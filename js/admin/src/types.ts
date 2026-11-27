@@ -12,6 +12,11 @@ export interface BotView {
   state: string;
   /** What the dialogue compare-and-sets when publishing, as `state` is for archiving. */
   visibility: string;
+  /**
+   * Whether a group admin may add the bot. Changed with the `allowgroups` and
+   * `disallowgroups` commands; disallowing also removes it from every group.
+   */
+  allowGroups: boolean;
   /** The destination. The SECRET never appears here or in any view. */
   webhookUrl: string;
   webhookState: string;
@@ -156,6 +161,8 @@ export type CommandKind =
   | "unarchive"
   | "publish"
   | "unpublish"
+  | "allowgroups"
+  | "disallowgroups"
   | "webhook"
   | "unwebhook"
   | "/keys"

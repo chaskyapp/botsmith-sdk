@@ -28,6 +28,12 @@ export interface Chat {
   title?: string;
 }
 
+/** A person the message mentions. Bots are never listed here. */
+export interface Mention {
+  userId: UserID;
+  name: string;
+}
+
 /** The message being answered, as the server summarises it. */
 export interface ReplyTo {
   messageId: MessageID;
@@ -43,6 +49,10 @@ export interface BotMessage {
   /** The wire carries seconds; this is a Date. */
   date: Date;
   text: string;
+  /** The people mentioned, as the server sent them (G12). Absent when none. */
+  mentions?: Mention[];
+  /** True only when the message mentions THIS bot. Absent otherwise. */
+  mentioned?: boolean;
   replyToMessage?: ReplyTo;
 }
 
@@ -145,6 +155,8 @@ export interface WireBotMessage {
   chat: WireChat;
   date: number;
   text: string;
+  mentions?: { user_id: UserID; name?: string }[];
+  mentioned?: boolean;
   reply_to_message?: { message_id: MessageID; from?: WireUser; text?: string };
 }
 

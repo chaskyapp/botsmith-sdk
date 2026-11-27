@@ -14,6 +14,8 @@ The guarantees are identical to the other two SDKs; the shape is Python's.
 | Concurrency | `AbortSignal` | `context.Context` | `asyncio` |
 | Terminal failure | `onFatal` callback | returned by `Run` | **raised** |
 | Handlers | `bot.on("text", fn)` | `bot.Handle(fn)` | `@bot.on_text` |
+| Every update | `bot.on("update", fn)` | `bot.HandleUpdate(fn)` | `@bot.on_update` |
+| Reply with mentions | `ctx.reply(text, { mentions })` | `e.ReplyWith(ctx, text, opts)` | `event.reply(text, mentions=...)` |
 | Entry point | `await bot.start()` | `bot.Run(ctx)` | `await bot.run()` |
 | Conformance | a CLI | `go test` | `unittest` |
 
@@ -33,6 +35,9 @@ async def echo(event: Event) -> None:
 
 await bot.run()
 ```
+
+Groups, mentions and rate limits work the same in all three SDKs: see
+[Groups](../README.md#groups).
 
 ## The one dependency
 

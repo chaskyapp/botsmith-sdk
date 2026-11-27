@@ -1,7 +1,7 @@
 import { ChaskyBotClient, type ChaskyBotClientOptions } from "./client.js";
 import { ChaskyUsageError, classify, retryDelayMs } from "./errors.js";
 import { polling, sleep, type Transport } from "./polling.js";
-import type { BotMessage, ChatID, MessageID, Update } from "./types.js";
+import type { BotMessage, ChatID, MessageID, Update, UserID } from "./types.js";
 
 export interface Context {
   readonly update: Update;
@@ -9,9 +9,15 @@ export interface Context {
   readonly chatId: ChatID;
   readonly client: ChaskyBotClient;
   /** sendMessage to this update's chat, with a managed Idempotency-Key. */
-  reply(text: string, options?: { replyToMessageId?: MessageID }): Promise<BotMessage>;
+  reply(text: string, options?: ReplyOptions): Promise<BotMessage>;
   /** Explicit on purpose — the runtime never sends a chat action by itself. */
   typing(): Promise<void>;
+}
+
+export interface ReplyOptions {
+  replyToMessageId?: MessageID;
+  /** `{ "<name as it appears in text>": "<user id>" }`, as in sendMessage. */
+  mentions?: Record<string, UserID>;
 }
 
 export type Handler = (ctx: Context) => void | Promise<void>;
@@ -83,7 +89,12 @@ export function createBot(options: CreateBotOptions): Bot {
           client,
           // G9: the chat id goes back exactly as it arrived. Never parsed,
           // never coerced — a coerced id addresses the wrong chat silently.
-          { chatId: message.chat.id, text, ...(replyOptions?.replyToMessageId ? { replyToMessageId: replyOptions.replyToMessageId } : {}) },
+          {
+            chatId: message.chat.id,
+            text,
+            ...(replyOptions?.replyToMessageId ? { replyToMessageId: replyOptions.replyToMessageId } : {}),
+            ...(replyOptions?.mentions ? { mentions: replyOptions.mentions } : {}),
+          },
           { attempts: sendAttempts, signal: controller?.signal, onError: emitError },
         ),
       typing: async () => {
@@ -150,7 +161,7 @@ export function createBot(options: CreateBotOptions): Bot {
  */
 async function sendWithRetry(
   client: ChaskyBotClient,
-  params: { chatId: ChatID; text: string; replyToMessageId?: MessageID },
+  params: { chatId: ChatID; text: string; replyToMessageId?: MessageID; mentions?: Record<string, UserID> },
   options: { attempts: number; signal?: AbortSignal | undefined; onError: (error: unknown) => void },
 ): Promise<BotMessage> {
   const idempotencyKey = newIdempotencyKey();

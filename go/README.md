@@ -43,10 +43,13 @@ The guarantees are identical to the TypeScript SDK; the shape is Go's.
 | Terminal failure | `onFatal` callback | returned by `Run` |
 | Errors | exceptions | error values, `errors.As` |
 | Handlers | `bot.on("text", fn)` | `bot.Handle(func(ctx, e) error)` |
+| Every update | `bot.on("update", fn)` | `bot.HandleUpdate(func(ctx, u) error)` |
+| Reply with mentions | `ctx.reply(text, { mentions })` | `e.ReplyWith(ctx, text, ReplyOptions{Mentions: m})` |
 | Entry point | `await bot.start()` | `bot.Run(ctx)` blocks |
 
 `Run` returning the terminal error is why this SDK has no `OnFatal`: in Go, an
 error that ends the loop belongs in the return value.
 
+- Groups, mentions and rate limits: [Groups](../README.md#groups)
 - Contract: [`../docs/00-spec.md`](../docs/00-spec.md)
 - Invariant vs idiomatic: [`../docs/01-organization.md`](../docs/01-organization.md) §3

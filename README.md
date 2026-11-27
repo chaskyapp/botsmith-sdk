@@ -1,6 +1,6 @@
 # botsmith-sdk — Client SDKs for the Chasky Bot API
 
-**Status: implemented in TypeScript, Go and Python — 24/24 conformance each.**
+**Status: implemented in TypeScript, Go and Python — 25/25 conformance each.**
 
 Monorepo for the SDKs a bot author installs to talk to the Chasky Bot API —
 filling the role `telegraf` and `python-telegram-bot` fill for Telegram.
@@ -13,9 +13,9 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 24/24 conformance |
-| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 24/24 conformance |
-| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 24/24 conformance |
+| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 25/25 conformance |
+| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 25/25 conformance |
+| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 25/25 conformance |
 
 ## Administration is a separate package, on purpose
 
@@ -48,7 +48,7 @@ contract). What keeps them apart now is cadence: administration follows the
 server's deltas, the runtime does not, and a change in one should never force a
 release of the other.
 
-All three pass the same 24 cases. The order was TypeScript → Go → Python, for
+All three pass the same 25 cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
 single consumer**, and Go was the cheapest second port because the team already
 writes it.
@@ -65,7 +65,7 @@ case is not a tested runner.
 - **[docs/01-organization.md](docs/01-organization.md)** — how that contract
   survives three implementations without drifting: layout, what is invariant and
   what is idiomatic, conformance suite, versioning, work order.
-- **[conformance/](conformance/)** — 24 shared cases that turn the guarantees
+- **[conformance/](conformance/)** — 25 shared cases that turn the guarantees
   into failing tests. They get written **before** any SDK, and every guarantee in
   the contract has at least one.
 
@@ -93,6 +93,9 @@ on every field, same reading of `date` as seconds. Only `update_id` and
 mappings agreeing against the real server is what the conformance suite alone
 could not establish.
 
+For bots in group chats — read modes, mentions, `my_chat_member` and rate
+limits — see [Groups](#groups) below.
+
 ## The three things that matter most
 
 1. **One process per bot, and starting up displaces whoever was there.** Since
@@ -103,6 +106,74 @@ could not establish.
    cursor, not a business acknowledgement.
 3. **The token travels in the path** and leaks into logs through the transport.
    Every error leaving the SDK is redacted.
+
+## Groups
+
+A bot can live in group chats, not only in the 1:1 a person opens with it.
+
+**Who puts it there.** Its owner allows it first, from administration: the
+`allowgroups` command (`disallowgroups` undoes it and also takes the bot out of
+every group it is in). Then a **group admin** adds it, and chooses two things
+for that group:
+
+| Choice | Values | What it means |
+|---|---|---|
+| Read mode | `all`, `mentions` | Every message from a person, or only the ones that mention the bot, reply to one of its messages, or are a command (`/start`, or `/start@its_username` — never `/start@another_bot`) |
+| History | `full`, `since_join` | Whether it may see what was said before it joined (the history method arrives later) |
+
+At most 10 bots per group. Messages from bots never reach a bot, in a group or
+in a 1:1, so two bots cannot answer each other forever.
+
+**What an update looks like in a group.** The same five fields as a 1:1, plus
+these (named as in TypeScript; Go and Python use their own casing):
+
+| Field | |
+|---|---|
+| `chat.type` | `"group"`, with `chat.title` |
+| `from.isBot` | `false` on what people write |
+| `mentions` | the **people** the message mentions, `{userId, name}`; absent when none |
+| `mentioned` | `true` only when the message mentions **this** bot |
+| `replyToMessage` | the message being answered: `{messageId, from, text}`, text cut at 500 |
+
+When the bot is added, has its modes changed, or leaves a group, it receives a
+`my_chat_member` update, with no message: who did it, and the old and new
+`{status, readMode, historyMode}`. To see it, register the catch-all handler,
+which runs for every update — including kinds this version of the SDK has no
+type for yet, which arrive with their raw form instead of being dropped (G10).
+
+**Sending to a group.** The same `sendMessage`, to the group's chat id. To
+mention someone, pass `mentions` as `{ "<name as it appears in your text>":
+"<user id>" }` — only active people of the group, at most 20. The SDK never
+sends the field empty (G12).
+
+| | TypeScript | Go | Python |
+|---|---|---|---|
+| Every update | `bot.on("update", fn)` | `bot.HandleUpdate(fn)` | `@bot.on_update` |
+| Membership change | `update.myChatMember` | `update.MyChatMember` | `update.my_chat_member` |
+| Reply with mentions | `ctx.reply(text, { mentions })` | `ev.ReplyWith(ctx, text, chaskybot.ReplyOptions{Mentions: m})` | `event.reply(text, mentions=...)` |
+| Allow groups | command `allowgroups`, `BotView.allowGroups` | `admin.CommandAllowGroups`, `BotView.AllowGroups` | command `"allowgroups"`, `BotView.allow_groups` |
+
+**New errors**, all business errors returned to the caller (the bot lives on):
+
+| Code | Description | When |
+|---|---|---|
+| 403 | `BOT_NOT_A_MEMBER` | The group exists but this bot is not an active member (it was removed) |
+| 400 | `MENTION_NOT_A_MEMBER` | A mention is not an active person of the chat, or is a bot |
+| 400 | `TOO_MANY_MENTIONS` | More than 20 mentions in one message |
+| 400 | `REPLY_TO_MESSAGE_NOT_FOUND` | Also when replying to another bot's message |
+
+Each SDK names these descriptions as constants. The SDK itself still decides
+only by code (§10.1 of the contract); the constants are for the author's own
+handling.
+
+**Rate limits.** Per bot: 30 requests per second in total (`getUpdates` does not
+count), 1 message per second per chat with a burst of 5, and 20 per minute per
+group. Over the limit the server answers `429 TOO_MANY_REQUESTS` with
+`retry_after` in seconds, and writes nothing. The SDK waits at least that long
+and resends the same message with the **same** `Idempotency-Key`, so the retry
+can never post twice; a `429` never stops the bot (G11). A send that is still
+refused after the SDK's attempts reaches the author as an error carrying the
+wait the server asked for.
 
 ## Decisions
 

@@ -42,6 +42,8 @@ export interface HandlerSpec {
   kind: "reply" | "noop";
   throwOnUpdateIds?: number[];
   replyText?: string;
+  /** The reply mentions everyone the update mentioned, as `{name: user_id}` (G12). */
+  mentionBack?: boolean;
 }
 
 export interface ManagementCall {

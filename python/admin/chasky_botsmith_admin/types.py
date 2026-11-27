@@ -10,7 +10,7 @@ T = TypeVar("T")
 CommandKind = Literal[
     "/newbot", "/mybots", "/help", "/cancel", "value", "select", "name",
     "description", "issue", "rotate", "revoke", "archive", "unarchive",
-    "publish", "unpublish", "webhook", "unwebhook", "/keys", "newkey", "revokekey",
+    "publish", "unpublish", "allowgroups", "disallowgroups", "webhook", "unwebhook", "/keys", "newkey", "revokekey",
     "confirm",
 ]
 
@@ -33,6 +33,10 @@ class BotView:
     #: What the dialogue compare-and-sets when publishing, as ``state`` is when
     #: archiving.
     visibility: str
+    #: Whether a group admin may add the bot. Owner view only. Changed with the
+    #: ``allowgroups`` and ``disallowgroups`` commands; disallowing also removes
+    #: the bot from every group.
+    allow_groups: bool
     #: The destination. The SECRET appears here in no view.
     webhook_url: str
     webhook_state: str
@@ -201,6 +205,7 @@ def bot_from_wire(raw: dict[str, Any]) -> BotView:
         description=raw.get("description", ""),
         state=raw.get("state", ""),
         visibility=raw.get("visibility", ""),
+        allow_groups=raw.get("allowGroups", False),
         webhook_url=raw.get("webhookUrl", ""),
         webhook_state=raw.get("webhookState", ""),
         credential_state=raw.get("credentialState", ""),

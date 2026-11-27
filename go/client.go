@@ -134,6 +134,9 @@ type SendMessageParams struct {
 	// IdempotencyKey is managed by the runtime: one per logical message, the
 	// same one on every retry of THAT message. See G4.
 	IdempotencyKey string
+	// Mentions maps the name as it appears in Text to a user id (G12). Sent
+	// only when non-empty: the server rejects a null or empty field.
+	Mentions map[string]UserID
 }
 
 func (c *Client) SendMessage(ctx context.Context, p SendMessageParams) (*Message, error) {
@@ -143,6 +146,9 @@ func (c *Client) SendMessage(ctx context.Context, p SendMessageParams) (*Message
 	body := map[string]any{"chat_id": p.ChatID, "text": p.Text}
 	if p.ReplyToMessageID != "" {
 		body["reply_to_message_id"] = p.ReplyToMessageID
+	}
+	if len(p.Mentions) > 0 {
+		body["mentions"] = p.Mentions
 	}
 	var headers map[string]string
 	if p.IdempotencyKey != "" {

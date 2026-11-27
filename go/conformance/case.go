@@ -46,6 +46,8 @@ type HandlerSpec struct {
 	Kind             string  `json:"kind"`
 	ThrowOnUpdateIds []int64 `json:"throwOnUpdateIds"`
 	ReplyText        string  `json:"replyText"`
+	// MentionBack: reply mentioning everyone the update mentioned (G12).
+	MentionBack bool `json:"mentionBack"`
 }
 
 type Assertions struct {

@@ -1,0 +1,193 @@
+{
+  "id": "g12-mentions-are-re-emitted-verbatim",
+  "contractVersion": "1.0",
+  "guarantee": "G12",
+  "title": "The people an update mentions reach the author intact, and go back out exactly as they arrived",
+  "why": "In a group the bot answers people by mentioning them, and the mention is what notifies them. Each mention carries a user id the server checks against the group's active members: an id coerced to a number, trimmed of its leading zeros or rebuilt from the name is rejected with MENTION_NOT_A_MEMBER and the reply is lost, or it notifies nobody. The second half is the mirror: a message that mentioned no one must not grow an empty or null mentions field on the way out, because the server's decoder rejects a null even where the field is optional (M1).",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply",
+      "mentionBack": true
+    }
+  },
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800089,
+                "text": "@Beto @Carla, can you see this?",
+                "mentions": [
+                  {
+                    "user_id": "0042",
+                    "name": "Beto"
+                  },
+                  {
+                    "user_id": "900719925474099111",
+                    "name": "Carla"
+                  }
+                ],
+                "mentioned": true,
+                "reply_to_message": {
+                  "message_id": "r4",
+                  "from": {
+                    "id": "bot:b1",
+                    "name": "pepi",
+                    "is_bot": true
+                  },
+                  "text": "Hi, group."
+                }
+              }
+            },
+            {
+              "update_id": 6,
+              "message": {
+                "message_id": "m6",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800090,
+                "text": "/help"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-group",
+          "text": "@Beto @Carla, can you see this?",
+          "mentions": {
+            "Beto": "0042",
+            "Carla": "900719925474099111"
+          }
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r5",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800091,
+            "text": "@Beto @Carla, can you see this?",
+            "mentions": [
+              {
+                "user_id": "0042",
+                "name": "Beto"
+              },
+              {
+                "user_id": "900719925474099111",
+                "name": "Carla"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-group",
+          "text": "/help",
+          "mentions": "$absent"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r6",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800092,
+            "text": "/help"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 7
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false
+  },
+  "run": {
+    "timeoutMs": 3000
+  }
+}

@@ -44,7 +44,14 @@ class SDKBot:
                 raise RuntimeError(f"handler failed on update {update_id}")
             if spec.get("kind") == "noop":
                 return
-            await event.reply(spec.get("replyText") or event.message.text)
+            # No mentions at all when the message had none: the SDK must not
+            # send the key empty (G12).
+            mentions = (
+                {m.name: m.user_id for m in event.message.mentions}
+                if spec.get("mentionBack")
+                else None
+            )
+            await event.reply(spec.get("replyText") or event.message.text, mentions=mentions)
 
         self._bot.on_error(self._record)
 

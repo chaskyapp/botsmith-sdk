@@ -11,6 +11,7 @@ import type {
   Envelope,
   MessageID,
   Update,
+  UserID,
   WebhookInfo,
   WireBotMessage,
   WireChat,
@@ -48,6 +49,11 @@ export interface SendMessageParams {
   chatId: ChatID;
   text: string;
   replyToMessageId?: MessageID | undefined;
+  /**
+   * `{ "<name as it appears in text>": "<user id>" }`. Only active people of the
+   * chat, at most 20; otherwise the server answers 400 and writes nothing.
+   */
+  mentions?: Record<string, UserID> | undefined;
 }
 
 /** A 1:1 wrapper over the four methods. No loop, no state beyond configuration. */
@@ -109,6 +115,8 @@ export class ChaskyBotClient {
     if (!params.text) throw new ChaskyUsageError("sendMessage requires a non-empty text");
     const body: Record<string, unknown> = { chat_id: params.chatId, text: params.text };
     if (params.replyToMessageId !== undefined) body["reply_to_message_id"] = params.replyToMessageId;
+    // Only when there is something to send: the server rejects a null (M1, G12).
+    if (params.mentions && Object.keys(params.mentions).length > 0) body["mentions"] = params.mentions;
 
     const headers: Record<string, string> = {};
     if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
@@ -232,6 +240,9 @@ function toBotMessage(raw: WireBotMessage): BotMessage {
     date: new Date((raw.date ?? 0) * 1000),
     text: raw.text ?? "",
   };
+  // G12: ids pass through as the strings they arrived as.
+  if (raw.mentions?.length) message.mentions = raw.mentions.map((m) => ({ userId: m.user_id, name: m.name ?? "" }));
+  if (raw.mentioned) message.mentioned = true;
   const reply = raw.reply_to_message;
   if (reply) message.replyToMessage = { messageId: reply.message_id, from: toUser(reply.from), text: reply.text ?? "" };
   return message;
