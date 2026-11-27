@@ -23,9 +23,23 @@ type Event struct {
 	onError  func(error)
 }
 
+// ReplyOptions are the optional parts of a reply.
+type ReplyOptions struct {
+	ReplyToMessageID MessageID
+	// Mentions maps the name as it appears in the text to a user id (G12).
+	Mentions map[string]UserID
+}
+
 // Reply sends to this update's chat with a managed Idempotency-Key.
 func (e *Event) Reply(ctx context.Context, text string) (*Message, error) {
+	return e.ReplyWith(ctx, text, ReplyOptions{})
+}
+
+// ReplyWith is Reply plus options. Retries reuse the same key, mentions included.
+func (e *Event) ReplyWith(ctx context.Context, text string, o ReplyOptions) (*Message, error) {
 	return sendWithRetry(ctx, e.client, SendMessageParams{
+		ReplyToMessageID: o.ReplyToMessageID,
+		Mentions:         o.Mentions,
 		// G9: the chat id goes back exactly as it arrived. Never parsed, never
 		// rebuilt — a real chat id carries "bot:" twice, and anything that
 		// takes it apart breaks against a live server.

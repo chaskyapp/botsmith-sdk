@@ -17,6 +17,9 @@ type BotView struct {
 	CredentialState   string `json:"credentialState"`
 	CredentialVersion int64  `json:"credentialVersion"`
 	MetadataVersion   int64  `json:"metadataVersion"`
+	// AllowGroups is in the owner view only. Disallowing also removes the bot
+	// from every group it was in.
+	AllowGroups bool `json:"allowGroups"`
 }
 
 type Capability struct {
@@ -178,6 +181,9 @@ const (
 	CommandUnpublish   CommandKind = "unpublish"
 	CommandWebhook     CommandKind = "webhook"
 	CommandUnwebhook   CommandKind = "unwebhook"
+	// Disallowing groups also removes the bot from every group it is in.
+	CommandAllowGroups    CommandKind = "allowgroups"
+	CommandDisallowGroups CommandKind = "disallowgroups"
 	// The developer-key commands. revokekey is not revoke: that one revokes a
 	// BOT credential, and sharing a name would let a typo revoke the wrong thing.
 	CommandKeys      CommandKind = "/keys"

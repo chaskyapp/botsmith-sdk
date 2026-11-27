@@ -73,6 +73,18 @@ type Message struct {
 	Date    time.Time
 	Text    string
 	ReplyTo *ReplyTo
+	// Mentions are the people the message names, ids exactly as received (G12).
+	Mentions []Mention
+	// Mentioned is true only when THIS bot is among the mentions.
+	Mentioned bool
+}
+
+// Mention is one person a message names. UserID is an opaque string: the server
+// checks it against the group's members, so coercing or rebuilding it loses
+// the reply (G12).
+type Mention struct {
+	UserID UserID
+	Name   string
 }
 
 type Update struct {
@@ -160,6 +172,11 @@ type wireMessage struct {
 	Chat      wireChat  `json:"chat"`
 	Date      int64     `json:"date"`
 	Text      string    `json:"text"`
+	Mentions  []struct {
+		UserID string `json:"user_id"`
+		Name   string `json:"name"`
+	} `json:"mentions"`
+	Mentioned bool `json:"mentioned"`
 	ReplyTo   *struct {
 		MessageID string    `json:"message_id"`
 		From      *wireUser `json:"from"`
@@ -213,6 +230,10 @@ func (m *wireMessage) toMessage() *Message {
 		From: m.From.toUser(),
 		Date: time.Unix(m.Date, 0).UTC(),
 		Text: m.Text,
+	}
+	out.Mentioned = m.Mentioned
+	for _, mention := range m.Mentions {
+		out.Mentions = append(out.Mentions, Mention{UserID: mention.UserID, Name: mention.Name})
 	}
 	if r := m.ReplyTo; r != nil {
 		out.ReplyTo = &ReplyTo{MessageID: r.MessageID, From: r.From.toUser(), Text: r.Text}

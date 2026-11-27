@@ -93,3 +93,13 @@ func retryDelay(err error, backoff time.Duration) time.Duration {
 	}
 	return backoff
 }
+
+// Descriptions the server documents for group sends. They are for logs and for
+// the author's own branching; the SDK itself never reads a description, because
+// flow control is the Code (§10.1).
+const (
+	DescBotNotAMember     = "BOT_NOT_A_MEMBER"
+	DescMentionNotAMember = "MENTION_NOT_A_MEMBER"
+	DescTooManyMentions   = "TOO_MANY_MENTIONS"
+	DescTooManyRequests   = "TOO_MANY_REQUESTS"
+)
