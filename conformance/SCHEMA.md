@@ -70,6 +70,13 @@ the format work:
 - `body` — **partial match**: declared fields must match, undeclared fields are
   ignored. Use `"$absent"` to require a field is missing.
 - `headers` — same partial-match rule, header names case-insensitive.
+- `waitedAtLeastMs` — this request must arrive at least this many milliseconds
+  after the previous request did. It is how a case says "you were told to
+  wait": a 429 carries `retry_after`, and a resend that comes sooner only earns
+  another 429 (G11). It is measured between arrivals, so a `delayMs` on the
+  previous response counts toward it. On a `repeat` exchange it applies to
+  every repetition, which is almost never what a case means: put the delayed
+  request in its own exchange and repeat a plain one after it.
 
 ### `respond`
 

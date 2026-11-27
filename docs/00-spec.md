@@ -663,6 +663,10 @@ to read in full before writing a bot.
   not wait up to 30 seconds for the server's deadline to expire.
 - **G9 — Identifiers are re-emitted exactly as received.** The SDK never converts
   an id (§9).
+- **G11 — A `429` is an instruction to wait, never a stop.** The SDK waits at
+  least `parameters.retry_after` seconds, then resends the same message with the
+  **same** `Idempotency-Key` (G4); a `429` while polling waits and keeps polling.
+  It is not one of the poller's terminal codes. (`g11` pair)
 
 #### Administration (M1–M5)
 
@@ -790,6 +794,7 @@ more robustly.
 | Terminal | `401`, `403`, `409` — **from the poll** | Stops the bot, fires `onFatal`. No retry. A `409 CONFLICT_POLLING` retried is an eviction war (§3.1), and the message says "another instance took over polling", not "configuration error". |
 | Business | `400`, `403`, `404` — **from a single call** | Returns the error to the caller. No retry: retrying an empty `text` yields an empty `text`. |
 | Transient | `500`, `5xx`, network, timeout | Exponential backoff with jitter, **reusing the same `Idempotency-Key`**. |
+| Rate-limited | `429 TOO_MANY_REQUESTS` — **from any call, the poll included** | Transient: waits at least `parameters.retry_after` seconds (longer if the backoff is longer), then retries with the same key (G11). |
 
 The reasoning: a `403` while **polling** means this bot is barred from polling at
 all — terminal. A `403` from a **send** means that one chat is not ours — the bot

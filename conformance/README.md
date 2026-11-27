@@ -34,8 +34,11 @@ Go ships second.
 | `g7-500-retries-with-backoff` | The mirror: transient means retry |
 | `g7-409-stops-and-sends-nothing-more` | Retrying a 409 is an eviction war |
 | `g9-identifiers-are-re-emitted-verbatim` | Ids are strings; every coercion is a silent error |
+| `g11-429-waits-retry-after-and-resends-same-key` | A 429 is "not yet": wait what the server said, resend the same message |
+| `g11-429-does-not-stop-the-bot` | The pair: a 429 at the poll is a wait, unlike a 401 at the same place |
 
-The three `g7-*` cases and the two `g4-*` cases are **pairs on purpose**. A single
+The three `g7-*` cases, the two `g4-*` cases and the two `g11-*` cases are
+**pairs on purpose**. A single
 case can be satisfied by an SDK that is wrong in the opposite direction — one that
 retries everything passes `g7-500`, one that stops on everything passes `g7-401`.
 The pair is what pins the boundary.
@@ -48,8 +51,9 @@ redaction, no clamping, retry everything including 401 and 409.
 
 Cases must fail against it **for their own reason**, and the useful expectation is
 not "all of them fail" — it is that each case fails exactly when its guarantee is
-violated and passes when it is not. The naive bot violates G2, G3, G4, G5, G6 and
-G7, so those cases fail; it happens to re-emit identifiers correctly and to retry
+violated and passes when it is not. The naive bot violates G2, G3, G4, G5, G6, G7
+and G11, so those cases fail — G11 because it neither resends after a 429 nor
+waits before polling again; it happens to re-emit identifiers correctly and to retry
 a 500 correctly, so `g9-*` and `g7-500-*` pass. **That split is the better
 signal**: a suite that rejects everything is as useless as one that accepts
 everything, and only a mixed result shows it discriminates.

@@ -1,0 +1,136 @@
+{
+  "id": "g11-429-waits-retry-after-and-resends-same-key",
+  "contractVersion": "1.0",
+  "guarantee": "G11",
+  "title": "A 429 on a send waits retry_after, then resends that message with the SAME Idempotency-Key",
+  "why": "The server rate-limits every bot per chat and per group, and a 429 writes nothing: the message was not delivered. Treating it as a business error drops the reply on the floor, which is the common case in a busy group. Resending before retry_after only earns another 429. Resending with a fresh key is not a retry: if the first attempt did land, the group sees the bot answer twice. The server tells the client exactly how long to wait in parameters.retry_after; this case holds the SDK to it.",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply"
+    }
+  },
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800089,
+                "text": "/hola"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "headers": {
+          "Idempotency-Key": "$capture:k1"
+        },
+        "body": {
+          "chat_id": "c-group",
+          "text": "/hola"
+        }
+      },
+      "respond": {
+        "status": 429,
+        "body": {
+          "ok": false,
+          "error_code": 429,
+          "description": "TOO_MANY_REQUESTS",
+          "parameters": {
+            "retry_after": 1
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "waitedAtLeastMs": 900,
+        "headers": {
+          "Idempotency-Key": "$same:k1"
+        },
+        "body": {
+          "chat_id": "c-group",
+          "text": "/hola"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r5",
+            "from": {
+              "id": "bot:b1",
+              "name": "pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800091,
+            "text": "/hola"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 6
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false
+  },
+  "run": {
+    "timeoutMs": 5000
+  }
+}
