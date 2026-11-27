@@ -101,15 +101,28 @@ func (c *Client) GetUpdates(ctx context.Context, p GetUpdatesParams) ([]Update, 
 	}
 	body := map[string]any{"offset": p.Offset, "limit": limit, "timeout": timeout}
 
-	var raw []wireUpdate
+	var raw []json.RawMessage
 	if err := c.call(ctx, "getUpdates", body, nil, &raw); err != nil {
 		return nil, err
 	}
 	// A missing or malformed result is an empty batch, never a panic: the poll
 	// loop must survive a server that answers something unexpected.
 	updates := make([]Update, 0, len(raw))
-	for _, u := range raw {
-		updates = append(updates, Update{ID: u.UpdateID, Message: u.Message.toMessage()})
+	for _, item := range raw {
+		var u wireUpdate
+		if err := json.Unmarshal(item, &u); err != nil {
+			// A shape this version cannot read still reaches the author, as its
+			// id and raw bytes; dropping it would hide it for good (G10).
+			var id struct {
+				UpdateID int64 `json:"update_id"`
+			}
+			if json.Unmarshal(item, &id) != nil {
+				continue
+			}
+			updates = append(updates, Update{ID: id.UpdateID, Raw: item})
+			continue
+		}
+		updates = append(updates, u.toUpdate(item))
 	}
 	return updates, nil
 }
