@@ -43,7 +43,10 @@ class SdkBotUnderTest implements BotUnderTest {
       const id = ctx.update.updateId;
       if (spec.throwOnUpdateIds?.includes(id)) throw new Error(`handler failed on update ${id}`);
       if (spec.kind === "noop") return;
-      await ctx.reply(spec.replyText ?? ctx.message.text);
+      const mentions = spec.mentionBack
+        ? Object.fromEntries((ctx.message.mentions ?? []).map((m) => [m.name, m.userId]))
+        : undefined;
+      await ctx.reply(spec.replyText ?? ctx.message.text, mentions ? { mentions } : {});
     });
 
     this.bot.onError((error) => this.errors.push(toReported(error)));

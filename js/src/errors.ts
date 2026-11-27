@@ -19,6 +19,22 @@ export class ChaskyApiError extends Error {
   }
 }
 
+/**
+ * Descriptions the server publishes for groups and rate limits, so a bot can
+ * tell them apart in its own handling without typing the strings. The SDK
+ * itself never branches on a description; flow control is `code` (§10.1).
+ */
+export const ErrorDescription = {
+  /** 403: a group where this bot is not an active member (it was removed). */
+  BotNotAMember: "BOT_NOT_A_MEMBER",
+  /** 400: a mention that is not an active person of the chat, or is a bot. */
+  MentionNotAMember: "MENTION_NOT_A_MEMBER",
+  /** 400: more than 20 mentions in one message. */
+  TooManyMentions: "TOO_MANY_MENTIONS",
+  /** 429: wait `retryAfter` seconds. The runtime already does (G11). */
+  TooManyRequests: "TOO_MANY_REQUESTS",
+} as const;
+
 /** The request never produced an envelope: network, DNS, abort, bad JSON. */
 export class ChaskyTransportError extends Error {
   override readonly cause: unknown;

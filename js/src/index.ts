@@ -4,6 +4,7 @@ export {
   type Context,
   type CreateBotOptions,
   type Handler,
+  type ReplyOptions,
   type UpdateHandler,
 } from "./bot.js";
 export {
@@ -15,7 +16,7 @@ export {
   type GetUpdatesParams,
   type SendMessageParams,
 } from "./client.js";
-export { ChaskyApiError, ChaskyTransportError, ChaskyUsageError, type ErrorClass } from "./errors.js";
+export { ChaskyApiError, ChaskyTransportError, ChaskyUsageError, ErrorDescription, type ErrorClass } from "./errors.js";
 export { polling, type PollingOptions, type Transport } from "./polling.js";
 export type {
   BotIdentity,
@@ -26,6 +27,7 @@ export type {
   ChatMemberState,
   ChatMemberUpdated,
   ChatID,
+  Mention,
   MessageID,
   ReplyTo,
   Update,
