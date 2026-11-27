@@ -37,7 +37,16 @@ from .client import (
     MAX_TIMEOUT_SECONDS,
     Client,
 )
-from .errors import APIError, ChaskyError, TransportError, UsageError
+from .errors import (
+    BOT_NOT_A_MEMBER,
+    MENTION_NOT_A_MEMBER,
+    TOO_MANY_MENTIONS,
+    TOO_MANY_REQUESTS,
+    APIError,
+    ChaskyError,
+    TransportError,
+    UsageError,
+)
 from .polling import Polling, Transport
 from .types import (
     BotIdentity,
@@ -46,6 +55,7 @@ from .types import (
     ChatAction,
     ChatMemberState,
     ChatMemberUpdated,
+    Mention,
     ReplyTo,
     Update,
     User,
@@ -53,6 +63,11 @@ from .types import (
 )
 
 __all__ = [
+    "BOT_NOT_A_MEMBER",
+    "MENTION_NOT_A_MEMBER",
+    "Mention",
+    "TOO_MANY_MENTIONS",
+    "TOO_MANY_REQUESTS",
     "APIError",
     "Bot",
     "BotIdentity",

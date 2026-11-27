@@ -37,6 +37,18 @@ class UsageError(ChaskyError):
     """Raised locally, before spending a request."""
 
 
+# Descriptions the server publishes for groups and rate limits, so a bot can
+# tell them apart in its own handling without typing the strings. The SDK
+# itself never branches on a description; flow control is the code (§10.1).
+#: 403: a group where this bot is not an active member (it was removed).
+BOT_NOT_A_MEMBER = "BOT_NOT_A_MEMBER"
+#: 400: a mention that is not an active person of the chat, or is a bot.
+MENTION_NOT_A_MEMBER = "MENTION_NOT_A_MEMBER"
+#: 400: more than 20 mentions in one message.
+TOO_MANY_MENTIONS = "TOO_MANY_MENTIONS"
+#: 429: wait ``retry_after`` seconds. The runtime already does (G11).
+TOO_MANY_REQUESTS = "TOO_MANY_REQUESTS"
+
 ErrorClass = Literal["terminal", "business", "transient"]
 ErrorSource = Literal["poll", "call"]
 

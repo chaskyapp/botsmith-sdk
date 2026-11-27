@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 from urllib.parse import urlparse
 
 import httpx
@@ -17,6 +17,7 @@ from .types import (
     ChatID,
     MessageID,
     Update,
+    UserID,
     WebhookInfo,
     message_from_wire,
     update_from_wire,
@@ -108,12 +109,17 @@ class Client:
         text: str,
         reply_to_message_id: MessageID | None = None,
         idempotency_key: str | None = None,
+        mentions: Mapping[str, UserID] | None = None,
     ) -> BotMessage:
+        """``mentions`` maps a name as it appears in ``text`` to a user id."""
         if not text:
             raise UsageError("send_message requires a non-empty text")
         body: dict[str, Any] = {"chat_id": chat_id, "text": text}
         if reply_to_message_id is not None:
             body["reply_to_message_id"] = reply_to_message_id
+        # Only when there is something to send: the server rejects a null (G12).
+        if mentions:
+            body["mentions"] = dict(mentions)
         headers = {"Idempotency-Key": idempotency_key} if idempotency_key else None
         return message_from_wire(await self._call("sendMessage", body, headers))
 

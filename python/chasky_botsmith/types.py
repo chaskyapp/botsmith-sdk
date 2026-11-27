@@ -75,6 +75,15 @@ class Chat:
 
 
 @dataclass(frozen=True, slots=True)
+class Mention:
+    """A person the message mentions. Bots are never listed."""
+
+    #: As received; an id is an opaque label.
+    user_id: UserID
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
 class ReplyTo:
     """The message a reply answers: just what the server embeds."""
 
@@ -92,6 +101,10 @@ class BotMessage:
     date: datetime
     text: str
     reply_to_message: ReplyTo | None = None
+    #: The people mentioned (G12). Empty when none.
+    mentions: tuple[Mention, ...] = ()
+    #: True only when the message mentions THIS bot.
+    mentioned: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +182,11 @@ def message_from_wire(raw: dict[str, Any]) -> BotMessage:
         chat=_chat(raw["chat"]),
         date=_date(raw),
         text=raw.get("text", ""),
+        mentions=tuple(
+            Mention(user_id=m.get("user_id", ""), name=m.get("name") or "")
+            for m in raw.get("mentions") or []
+        ),
+        mentioned=raw.get("mentioned") is True,
         reply_to_message=(
             ReplyTo(
                 message_id=reply.get("message_id", ""),

@@ -5,14 +5,14 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass, field
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Mapping
 
 import httpx
 
 from .client import Client
 from .errors import UsageError, classify, retry_delay
 from .polling import Polling, Transport, TransportDeps, _backoff
-from .types import BotMessage, ChatID, MessageID, Update
+from .types import BotMessage, ChatID, MessageID, Update, UserID
 
 
 @dataclass(slots=True)
@@ -26,7 +26,13 @@ class Event:
     _attempts: int = field(repr=False, default=4)
     _on_error: Callable[[BaseException], None] = field(repr=False, default=lambda _e: None)
 
-    async def reply(self, text: str, *, reply_to_message_id: MessageID | None = None) -> BotMessage:
+    async def reply(
+        self,
+        text: str,
+        *,
+        reply_to_message_id: MessageID | None = None,
+        mentions: Mapping[str, UserID] | None = None,
+    ) -> BotMessage:
         """Send to this update's chat with a managed Idempotency-Key."""
         return await _send_with_retry(
             self.client,
@@ -36,6 +42,7 @@ class Event:
             chat_id=self.chat_id,
             text=text,
             reply_to_message_id=reply_to_message_id,
+            mentions=mentions,
             attempts=self._attempts,
             on_error=self._on_error,
         )
@@ -173,6 +180,7 @@ async def _send_with_retry(
     chat_id: ChatID,
     text: str,
     reply_to_message_id: MessageID | None,
+    mentions: Mapping[str, UserID] | None,
     attempts: int,
     on_error: Callable[[BaseException], None],
 ) -> BotMessage:
@@ -191,6 +199,7 @@ async def _send_with_retry(
                 chat_id=chat_id,
                 text=text,
                 reply_to_message_id=reply_to_message_id,
+                mentions=mentions,
                 idempotency_key=key,
             )
         except asyncio.CancelledError:
