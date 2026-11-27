@@ -544,10 +544,18 @@ type UserID    = string;  // "bot:{uuid}" or the human's id
 type MessageID = string;
 type UpdateID  = number;  // the ONLY numeric one. See §9.
 
-interface BotUser    { id: UserID; name: string }
-interface Chat       { id: ChatID; type: string }
-interface BotMessage { messageId: MessageID; from: BotUser; chat: Chat; date: Date; text: string }
-interface Update     { updateId: UpdateID; message?: BotMessage }
+interface BotUser    { id: UserID; name: string; isBot?: boolean }
+interface Chat       { id: ChatID; type: string; title?: string }   // type: "private" | "group" | anything later
+interface Mention    { userId: UserID; name: string }               // people only
+interface BotMessage { messageId: MessageID; from: BotUser; chat: Chat; date: Date; text: string;
+                       mentions?: Mention[]; mentioned?: boolean;   // mentioned: THIS bot
+                       replyToMessage?: { messageId: MessageID; from: BotUser; text: string } }
+interface Update     { updateId: UpdateID; message?: BotMessage;
+                       myChatMember?: ChatMemberUpdated;            // added, modes changed, left
+                       raw: Record<string, unknown> }               // every kind arrives (G10)
+interface ChatMemberUpdated { chat: Chat; from: BotUser; date: Date;
+                              oldState: ChatMemberState; newState: ChatMemberState }
+interface ChatMemberState   { status: string; readMode?: string; historyMode?: string }
 interface BotIdentity { id: UserID; isBot: true; username: string; displayName: string }
 ```
 
