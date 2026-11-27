@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from chasky_botsmith import APIError, Bot, Event, Polling
+from chasky_botsmith import APIError, Bot, Event, Polling, Update
 
 from .runner import BotOptions, BotUnderTest, ReportedError
 
@@ -31,10 +31,15 @@ class SDKBot:
             on_warning=self.warnings.append,
         )
 
+        # Counted in the catch-all hook, so an update kind the SDK has no type
+        # for is counted too (G10).
+        @self._bot.on_update
+        async def count(update: Update) -> None:
+            self.handler_runs[update.update_id] = self.handler_runs.get(update.update_id, 0) + 1
+
         @self._bot.on_text
         async def handle(event: Event) -> None:
             update_id = event.update.update_id
-            self.handler_runs[update_id] = self.handler_runs.get(update_id, 0) + 1
             if update_id in (spec.get("throwOnUpdateIds") or []):
                 raise RuntimeError(f"handler failed on update {update_id}")
             if spec.get("kind") == "noop":

@@ -51,6 +51,9 @@ class Event:
 
 Handler = Callable[[Event], Awaitable[None]]
 
+#: Sees every update, including ones with no message (G10).
+UpdateHandler = Callable[[Update], Awaitable[None]]
+
 
 class Bot:
     def __init__(
@@ -75,6 +78,7 @@ class Bot:
         self._attempts = send_attempts
         self._commands: dict[str, Handler] = {}
         self._handlers: list[Handler] = []
+        self._update_handlers: list[UpdateHandler] = []
         self._error_listeners: list[Callable[[BaseException], None]] = []
         self._running = False
 
@@ -90,6 +94,15 @@ class Bot:
     def on_text(self, handler: Handler) -> Handler:
         """Register a handler for any text that matched no command."""
         self._handlers.append(handler)
+        return handler
+
+    def on_update(self, handler: UpdateHandler) -> UpdateHandler:
+        """Run for EVERY update, before command and text dispatch (G10).
+
+        That includes updates with no message and kinds this version has no
+        field for; ``update.raw`` still carries them.
+        """
+        self._update_handlers.append(handler)
         return handler
 
     def on_error(self, listener: Callable[[BaseException], None]) -> Callable[[BaseException], None]:
@@ -133,6 +146,8 @@ class Bot:
             listener(error)
 
     async def _dispatch(self, update: Update) -> None:
+        for update_handler in self._update_handlers:
+            await update_handler(update)
         if update.message is None:
             return
         event = Event(
