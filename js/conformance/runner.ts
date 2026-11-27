@@ -397,6 +397,13 @@ function checkAssertions(testCase: ConformanceCase, bot: BotUnderTest, lifecycle
     }
   }
 
+  // An explicit empty list means "none at all"; an absent one says nothing.
+  if (want.errorsReported?.length === 0 && bot.errors.length > 0) {
+    failures.push(
+      failure("assert.errorsReported", `expected no errors, got ${JSON.stringify(bot.errors.map((e) => e.message))}`),
+    );
+  }
+
   for (const warning of want.warnings ?? []) {
     if (!bot.warnings.some((w) => w.toLowerCase().includes(warning.contains.toLowerCase()))) {
       failures.push(

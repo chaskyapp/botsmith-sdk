@@ -4,6 +4,8 @@
  * This is what an author writes by hand after reading the endpoint list and
  * nothing else: advance the offset only on success, no deduplication, one
  * idempotency key reused forever, no redaction, no clamping, retry everything.
+ * It was written against the 1:1 docs, so every update has a message and a 429
+ * is just another failure.
  *
  * It exists so the runner can be trusted. A runner that has never failed a case
  * is not a tested runner — it might be reporting PASS because it checks nothing.
@@ -92,11 +94,13 @@ class NaiveBot implements BotUnderTest {
     handler: HandlerSpec,
   ): Promise<void> {
     if (handler.throwOnUpdateIds?.includes(update.update_id)) throw new Error("handler failed");
-    if (handler.kind === "noop" || !update.message) return;
+    if (handler.kind === "noop") return;
+    // The docs it read listed no update without a message, so it never checks:
+    // the first my_chat_member, or any later kind, throws here.
     await fetch(this.url("sendMessage"), {
       method: "POST",
       headers: { "content-type": "application/json", "Idempotency-Key": this.key },
-      body: JSON.stringify({ chat_id: update.message.chat.id, text: handler.replyText ?? update.message.text }),
+      body: JSON.stringify({ chat_id: update.message!.chat.id, text: handler.replyText ?? update.message!.text }),
     });
   }
 }
