@@ -1,4 +1,11 @@
-export { createBot, type Bot, type Context, type CreateBotOptions, type Handler } from "./bot.js";
+export {
+  createBot,
+  type Bot,
+  type Context,
+  type CreateBotOptions,
+  type Handler,
+  type UpdateHandler,
+} from "./bot.js";
 export {
   ChaskyBotClient,
   DEFAULT_BASE_URL,
@@ -16,8 +23,11 @@ export type {
   BotUser,
   Chat,
   ChatAction,
+  ChatMemberState,
+  ChatMemberUpdated,
   ChatID,
   MessageID,
+  ReplyTo,
   Update,
   UpdateID,
   UserID,

@@ -13,11 +13,27 @@ export type UpdateID = number;
 export interface BotUser {
   id: UserID;
   name: string;
+  /** Sent in groups. Absent in a 1:1, where the sender is always a person. */
+  isBot?: boolean;
 }
 
 export interface Chat {
   id: ChatID;
+  /**
+   * `private` or `group` today. Typed as a string on purpose: a value this
+   * version does not know is passed through, never rejected (G10).
+   */
   type: string;
+  /** The group's name. Only groups have one. */
+  title?: string;
+}
+
+/** The message being answered, as the server summarises it. */
+export interface ReplyTo {
+  messageId: MessageID;
+  from: BotUser;
+  /** Truncated by the server to 500 characters. */
+  text: string;
 }
 
 export interface BotMessage {
@@ -27,11 +43,37 @@ export interface BotMessage {
   /** The wire carries seconds; this is a Date. */
   date: Date;
   text: string;
+  replyToMessage?: ReplyTo;
+}
+
+/** `member` or `left`; the modes only travel while the bot is a member. */
+export interface ChatMemberState {
+  status: string;
+  /** `all` or `mentions`. */
+  readMode?: string;
+  /** `full` or `since_join`. */
+  historyMode?: string;
+}
+
+/** The bot was added to a group, had its modes changed, or left it. */
+export interface ChatMemberUpdated {
+  chat: Chat;
+  /** Who made the change. */
+  from: BotUser;
+  date: Date;
+  oldState: ChatMemberState;
+  newState: ChatMemberState;
 }
 
 export interface Update {
   updateId: UpdateID;
   message?: BotMessage;
+  myChatMember?: ChatMemberUpdated;
+  /**
+   * The update exactly as the server sent it. For a kind this version has no
+   * field for, this is the only way to read it — and it still arrives (G10).
+   */
+  raw: Record<string, unknown>;
 }
 
 export interface BotIdentity {
@@ -85,15 +127,41 @@ export type Envelope<T> =
   | { ok: false; error_code?: number; description?: string; parameters?: { retry_after?: number } };
 
 /** Wire shapes, before mapping. Never exported from the package root. */
+export interface WireUser {
+  id: UserID;
+  name: string;
+  is_bot?: boolean;
+}
+
+export interface WireChat {
+  id: ChatID;
+  type: string;
+  title?: string;
+}
+
 export interface WireBotMessage {
   message_id: MessageID;
-  from?: { id: UserID; name: string };
-  chat: { id: ChatID; type: string };
+  from?: WireUser;
+  chat: WireChat;
   date: number;
   text: string;
+  reply_to_message?: { message_id: MessageID; from?: WireUser; text?: string };
+}
+
+export interface WireMemberState {
+  status: string;
+  read_mode?: string;
+  history_mode?: string;
 }
 
 export interface WireUpdate {
   update_id: UpdateID;
   message?: WireBotMessage;
+  my_chat_member?: {
+    chat: WireChat;
+    from?: WireUser;
+    date: number;
+    old_state?: WireMemberState;
+    new_state?: WireMemberState;
+  };
 }

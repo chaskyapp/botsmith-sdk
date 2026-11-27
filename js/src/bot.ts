@@ -16,6 +16,9 @@ export interface Context {
 
 export type Handler = (ctx: Context) => void | Promise<void>;
 
+/** Sees every update, including `myChatMember` and kinds this version has no field for. */
+export type UpdateHandler = (update: Update, client: ChaskyBotClient) => void | Promise<void>;
+
 export interface CreateBotOptions extends ChaskyBotClientOptions {
   transport?: Transport | undefined;
   /** Attempts for one logical send before giving up. All reuse the same key. */
@@ -25,6 +28,8 @@ export interface CreateBotOptions extends ChaskyBotClientOptions {
 export interface Bot {
   command(name: string, handler: Handler): Bot;
   on(event: "text", handler: Handler): Bot;
+  /** Runs before the text and command handlers, for every update (G10). */
+  on(event: "update", handler: UpdateHandler): Bot;
   onError(listener: (error: unknown) => void): Bot;
   onFatal(listener: (error: unknown) => void): Bot;
   start(): Promise<void>;
@@ -39,6 +44,7 @@ export function createBot(options: CreateBotOptions): Bot {
   const sendAttempts = options.sendAttempts ?? 4;
   const commands = new Map<string, Handler>();
   const textHandlers: Handler[] = [];
+  const updateHandlers: UpdateHandler[] = [];
   const errorListeners: ((error: unknown) => void)[] = [];
   const fatalListeners: ((error: unknown) => void)[] = [];
 
@@ -53,6 +59,7 @@ export function createBot(options: CreateBotOptions): Bot {
   };
 
   async function dispatch(update: Update): Promise<void> {
+    for (const updateHandler of updateHandlers) await updateHandler(update, client);
     const message = update.message;
     if (!message) return;
     const ctx = makeContext(update, message);
@@ -91,8 +98,9 @@ export function createBot(options: CreateBotOptions): Bot {
       commands.set(name.replace(/^\//, ""), handler);
       return bot;
     },
-    on(_event, handler) {
-      textHandlers.push(handler);
+    on(event: "text" | "update", handler: Handler | UpdateHandler) {
+      if (event === "update") updateHandlers.push(handler as UpdateHandler);
+      else textHandlers.push(handler as Handler);
       return bot;
     },
     onError(listener) {
