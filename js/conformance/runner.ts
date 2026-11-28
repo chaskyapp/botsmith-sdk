@@ -38,6 +38,7 @@ export async function runCase(
 
   const server = new FakeServer(testCase.exchanges);
   await server.start();
+  const baseUrl = server.baseUrl;
 
   let bot: BotUnderTest | null = null;
   const failures: Failure[] = [];
@@ -102,7 +103,7 @@ export async function runCase(
     failures.push(failure("crash", `the bot threw and did not handle it: ${crash}`));
   }
   failures.push(...checkRequests(testCase, server));
-  if (bot) failures.push(...checkAssertions(testCase, bot, { secondStartRejected, stopDurationMs }));
+  if (bot) failures.push(...checkAssertions(testCase, bot, { secondStartRejected, stopDurationMs, baseUrl }));
   return { case: testCase, failures };
 }
 
@@ -319,6 +320,8 @@ function checkRequests(testCase: ConformanceCase, server: FakeServer): Failure[]
 interface Lifecycle {
   secondStartRejected: boolean;
   stopDurationMs: number | undefined;
+  /** The fake's base URL, for {baseUrl} in attachmentsSeen. */
+  baseUrl: string;
 }
 
 function checkAssertions(testCase: ConformanceCase, bot: BotUnderTest, lifecycle: Lifecycle): Failure[] {
@@ -413,7 +416,26 @@ function checkAssertions(testCase: ConformanceCase, bot: BotUnderTest, lifecycle
       );
     }
   }
+
+  if (want.attachmentsSeen !== undefined) {
+    // Exact, not partial: a field the SDK dropped or converted is the defect
+    // this assertion exists to catch (G14).
+    const expected = JSON.stringify(want.attachmentsSeen).replaceAll("{baseUrl}", lifecycle.baseUrl);
+    const actual = canonical(bot.attachmentsSeen ?? []);
+    if (canonical(JSON.parse(expected) as Json) !== actual) {
+      failures.push(failure("assert.attachmentsSeen", `expected ${canonical(JSON.parse(expected) as Json)}, got ${actual}`));
+    }
+  }
   return failures;
+}
+
+/** JSON with sorted keys, so two equal values print the same. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+      : v,
+  );
 }
 
 function describeExpected(expected: { method?: string; path?: string }): string {

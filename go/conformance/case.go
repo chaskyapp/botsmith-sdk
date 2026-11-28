@@ -32,6 +32,9 @@ type CannedResponse struct {
 	Body           any    `json:"body"`
 	TransportError string `json:"transportError"`
 	DelayMs        int    `json:"delayMs"`
+	// RawBody is sent verbatim as application/octet-stream instead of a JSON
+	// body: the media store an attachment's url points at (G14).
+	RawBody *string `json:"rawBody"`
 }
 
 type Exchange struct {
@@ -50,6 +53,10 @@ type HandlerSpec struct {
 	MentionBack bool `json:"mentionBack"`
 	// Commands: each name is a command that replies with its text (G13).
 	Commands map[string]string `json:"commands"`
+	// RecordAttachments registers an attachment handler that records what it
+	// received; DownloadAttachments makes it download each one too (G14).
+	RecordAttachments   bool `json:"recordAttachments"`
+	DownloadAttachments bool `json:"downloadAttachments"`
 }
 
 type Assertions struct {
@@ -82,6 +89,9 @@ type Assertions struct {
 	SecondStartRejected *bool `json:"secondStartRejected"`
 	// StoppedWithinMs: Stop returned within this budget (G8).
 	StoppedWithinMs *int `json:"stoppedWithinMs"`
+	// AttachmentsSeen: every run of the attachment handler, compared exactly
+	// after {baseUrl} is substituted (G14).
+	AttachmentsSeen json.RawMessage `json:"attachmentsSeen"`
 }
 
 type ManagementCall struct {

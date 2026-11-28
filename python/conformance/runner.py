@@ -91,6 +91,7 @@ async def run_case(
         return await run_management_case(case, management_factory or sdk_management_factory)
 
     fake = FakeServer(case["exchanges"])
+    base_url = fake.base_url
     failures: list[Failure] = []
     bot: BotUnderTest | None = None
     second_start_rejected = False
@@ -136,7 +137,24 @@ async def run_case(
     failures.extend(_check_requests(case, fake))
     if bot is not None:
         failures.extend(_check_assertions(case, bot, second_start_rejected, stop_duration))
+        failures.extend(_check_attachments_seen(case, bot, base_url))
     return failures
+
+
+def _check_attachments_seen(case: dict[str, Any], bot: BotUnderTest, base_url: str) -> list[Failure]:
+    """Exact, not partial: a dropped or converted field is the defect (G14)."""
+    want = case.get("assert", {}).get("attachmentsSeen")
+    if want is None:
+        return []
+    expected = _canonical(json.loads(json.dumps(want).replace("{baseUrl}", base_url)))
+    actual = _canonical(getattr(bot, "attachments_seen", []))
+    if expected == actual:
+        return []
+    return [Failure("assert.attachmentsSeen", f"expected {expected}, got {actual}")]
+
+
+def _canonical(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 async def run_management_case(case: dict[str, Any], factory: Any) -> list[Failure]:

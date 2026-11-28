@@ -85,6 +85,14 @@ the format work:
   string is the error text, and it may contain `{url}` so a runner can reproduce
   the real-world case where the client library embeds the full URL (G5).
 - `delayMs` — hold the response, for timeout and cancellation cases.
+- `rawBody` — instead of `body`, send this string verbatim as
+  `application/octet-stream`. It is how a case serves a file that is not an
+  envelope: the media store an attachment's `url` points at (G14).
+
+**`{baseUrl}`** in a `respond.body` string, and in `assert.attachmentsSeen`, is
+replaced by the fake's own base URL (scheme, host and port, no path). It is how
+a case hands the SDK a URL that leads back to the fake without knowing its
+port.
 
 ## Value matchers
 
@@ -123,6 +131,8 @@ function. The vocabulary is deliberately tiny; grow it only when a case needs it
 | `throwOnUpdateIds` | update ids on which the handler raises |
 | `replyText` | text to send; defaults to echoing the received text |
 | `mentionBack` | the reply mentions everyone the update mentioned, as `{name: user_id}`, and sends no `mentions` when the update had none (G12) |
+| `recordAttachments` | registers an attachment handler that records what it received, for `assert.attachmentsSeen` (G14) |
+| `downloadAttachments` | that handler also downloads every attachment with the SDK's helper, reading it to the end, and records the byte count (G14) |
 | `commands` | `{ "<name>": "<reply text>" }`: registers each name as a command whose handler replies with that text. Text that is not a command for this bot reaches the text handler as usual (G13) |
 
 The handler sees **every** update, including kinds the SDK has no type for
@@ -155,6 +165,14 @@ Everything that is not an observed request.
 | `warnings` | `[{ "contains": "..." }]` — warnings emitted (G6, D8) |
 | `secondStartRejected` | the second `start()` failed locally, without a request (G1) |
 | `stoppedWithinMs` | `stop()` returned within this many milliseconds (G8) |
+| `attachmentsSeen` | every run of the attachment handler, in order, compared **exactly**: `[{ "updateId", "text", "caption", "attachmentsTruncated", "attachments": [...] }]` (G14) |
+
+`attachmentsSeen` is the one assertion that reads typed fields, so its shape is
+fixed by the runner, not by the SDK: each adapter translates what its handler
+received back into the wire names (`file_id`, `kind`, `file_name`, `mime_type`,
+`file_size`, `url`, and `width`, `height`, `duration` only when present), plus
+`downloadedBytes` when the case downloads. A field the SDK dropped, renamed or
+converted shows up as a difference. `caption` is `""` when the message had none.
 
 `notContains` is how G5 is pinned: the case asserts the token string never
 appears in anything the SDK hands back.

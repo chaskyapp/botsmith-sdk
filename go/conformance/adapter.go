@@ -29,6 +29,13 @@ type BotUnderTest interface {
 	Warnings() []string
 }
 
+// AttachmentRecorder is implemented by a bot whose attachment handler records
+// what it received, translated back into wire names (SCHEMA.md,
+// attachmentsSeen). Separate from BotUnderTest so a fixture need not care.
+type AttachmentRecorder interface {
+	AttachmentsSeen() []any
+}
+
 type BotOptions struct {
 	BaseURL        string
 	Token          string
