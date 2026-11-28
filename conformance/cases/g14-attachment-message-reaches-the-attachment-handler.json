@@ -1,0 +1,249 @@
+{
+  "id": "g14-attachment-message-reaches-the-attachment-handler",
+  "contractVersion": "1.0",
+  "guarantee": "G14",
+  "title": "A message whose content is an attachment reaches the attachment handler whole, never the text handler with an empty text",
+  "why": "A person who sends a PDF or a photo to a bot sends no text: the server delivers text \"\" and puts what they typed, if anything, in caption. An SDK that has no field for attachments hands the text handler an empty string, and the bot answers a document with \"You said: \" or crashes on it; that is what the first SDK did in the manual test of 2026-11-27. Every field of every attachment has to arrive, because the bot needs url to fetch the file and kind and mime_type to decide what to do with it. attachments_truncated is the only way the bot learns that a message had more than the ten files it was given. A file_id that looks numeric stays a string, like every identifier in the contract (G9), and a file of exactly 100 MB, the server's limit, reports its size intact.",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply",
+      "replyText": "text handler ran",
+      "recordAttachments": true
+    }
+  },
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800085,
+                "text": "",
+                "caption": "Q3 numbers",
+                "attachments": [
+                  {
+                    "file_id": "a1",
+                    "kind": "image",
+                    "file_name": "chart.png",
+                    "mime_type": "image/png",
+                    "file_size": 16611,
+                    "url": "https://media.example/a1.png",
+                    "width": 1128,
+                    "height": 252
+                  },
+                  {
+                    "file_id": "a2",
+                    "kind": "document",
+                    "file_name": "Q3 report.pdf",
+                    "mime_type": "application/pdf",
+                    "file_size": 48213,
+                    "url": "https://media.example/a2.pdf"
+                  },
+                  {
+                    "file_id": "a3",
+                    "kind": "voice",
+                    "file_name": "note.m4a",
+                    "mime_type": "audio/mp4",
+                    "file_size": 5120,
+                    "url": "https://media.example/a3.m4a",
+                    "duration": 7
+                  }
+                ],
+                "attachments_truncated": true
+              }
+            },
+            {
+              "update_id": 6,
+              "message": {
+                "message_id": "m6",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1795800086,
+                "text": "",
+                "attachments": [
+                  {
+                    "file_id": "0042",
+                    "kind": "document",
+                    "file_name": "budget.xlsx",
+                    "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "file_size": 104857600,
+                    "url": "https://media.example/0042.xlsx?X-Amz-Signature=s1"
+                  }
+                ]
+              }
+            },
+            {
+              "update_id": 7,
+              "message": {
+                "message_id": "m7",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1795800087,
+                "text": "hello"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "bot:bot:b1:u1",
+          "text": "text handler ran"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r7",
+            "from": {
+              "id": "bot:b1",
+              "name": "Pepi"
+            },
+            "chat": {
+              "id": "bot:bot:b1:u1",
+              "type": "private"
+            },
+            "date": 1795800088,
+            "text": "text handler ran"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 8
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false,
+    "errorsReported": [],
+    "handlerRuns": [
+      {
+        "updateId": 5,
+        "times": 1
+      },
+      {
+        "updateId": 6,
+        "times": 1
+      },
+      {
+        "updateId": 7,
+        "times": 1
+      }
+    ],
+    "attachmentsSeen": [
+      {
+        "updateId": 5,
+        "text": "",
+        "caption": "Q3 numbers",
+        "attachmentsTruncated": true,
+        "attachments": [
+          {
+            "file_id": "a1",
+            "kind": "image",
+            "file_name": "chart.png",
+            "mime_type": "image/png",
+            "file_size": 16611,
+            "url": "https://media.example/a1.png",
+            "width": 1128,
+            "height": 252
+          },
+          {
+            "file_id": "a2",
+            "kind": "document",
+            "file_name": "Q3 report.pdf",
+            "mime_type": "application/pdf",
+            "file_size": 48213,
+            "url": "https://media.example/a2.pdf"
+          },
+          {
+            "file_id": "a3",
+            "kind": "voice",
+            "file_name": "note.m4a",
+            "mime_type": "audio/mp4",
+            "file_size": 5120,
+            "url": "https://media.example/a3.m4a",
+            "duration": 7
+          }
+        ]
+      },
+      {
+        "updateId": 6,
+        "text": "",
+        "caption": "",
+        "attachmentsTruncated": false,
+        "attachments": [
+          {
+            "file_id": "0042",
+            "kind": "document",
+            "file_name": "budget.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "file_size": 104857600,
+            "url": "https://media.example/0042.xlsx?X-Amz-Signature=s1"
+          }
+        ]
+      }
+    ]
+  },
+  "run": {
+    "timeoutMs": 3000
+  }
+}

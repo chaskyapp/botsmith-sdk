@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from chasky_botsmith import APIError, Bot, Event, Polling, Update
+from typing import Any
+
+from chasky_botsmith import APIError, Attachment, Bot, Event, Polling, Update
 
 from .runner import BotOptions, BotUnderTest, ReportedError
 
@@ -15,6 +17,7 @@ class SDKBot:
         self.handler_runs: dict[int, int] = {}
         self.errors: list[ReportedError] = []
         self.warnings: list[str] = []
+        self.attachments_seen: list[dict[str, Any]] = []
         self._task: asyncio.Task[None] | None = None
 
         spec = options.handler
@@ -52,6 +55,28 @@ class SDKBot:
                 else None
             )
             await event.reply(spec.get("replyText") or event.message.text, mentions=mentions)
+
+        if spec.get("recordAttachments"):
+
+            @self._bot.on_attachment
+            async def record(event: Event) -> None:
+                attachments = []
+                for attachment in event.message.attachments:
+                    seen = _wire_attachment(attachment)
+                    if spec.get("downloadAttachments"):
+                        seen["downloadedBytes"] = await _count_bytes(self._bot, attachment)
+                    attachments.append(seen)
+                # Back into wire names, so the case compares one shape across
+                # languages (SCHEMA.md, attachmentsSeen).
+                self.attachments_seen.append(
+                    {
+                        "updateId": event.update.update_id,
+                        "text": event.message.text,
+                        "caption": event.message.caption,
+                        "attachmentsTruncated": event.message.attachments_truncated,
+                        "attachments": attachments,
+                    }
+                )
 
         for name, reply_text in (spec.get("commands") or {}).items():
             self._bot.command(name)(_replying(reply_text))
@@ -98,6 +123,30 @@ class SDKBot:
     def _record(self, error: BaseException) -> None:
         code = error.code if isinstance(error, APIError) else None
         self.errors.append(ReportedError(message=str(error), code=code))
+
+
+def _wire_attachment(a: Attachment) -> dict[str, Any]:
+    wire: dict[str, Any] = {
+        "file_id": a.file_id,
+        "kind": a.kind,
+        "file_name": a.file_name,
+        "mime_type": a.mime_type,
+        "file_size": a.file_size,
+        "url": a.url,
+    }
+    for name in ("width", "height", "duration"):
+        value = getattr(a, name)
+        if value is not None:
+            wire[name] = value
+    return wire
+
+
+async def _count_bytes(bot: Bot, attachment: Attachment) -> int:
+    total = 0
+    async with bot.client.download(attachment) as chunks:
+        async for chunk in chunks:
+            total += len(chunk)
+    return total
 
 
 def _replying(text: str):  # noqa: ANN202 - a handler factory

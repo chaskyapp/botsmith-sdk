@@ -7,7 +7,9 @@
 import { createBot, type Bot } from "../src/bot.js";
 import { ChaskyApiError } from "../src/errors.js";
 import { polling } from "../src/polling.js";
+import type { Attachment } from "../src/types.js";
 import type { BotFactory, BotUnderTest, BotUnderTestOptions, ReportedError } from "./adapter.js";
+import type { Json } from "./types.js";
 
 class SdkBotUnderTest implements BotUnderTest {
   private readonly bot: Bot;
@@ -16,6 +18,7 @@ class SdkBotUnderTest implements BotUnderTest {
   readonly handlerRuns = new Map<number, number>();
   readonly errors: ReportedError[] = [];
   readonly warnings: string[] = [];
+  readonly attachmentsSeen: Json[] = [];
 
   constructor(options: BotUnderTestOptions) {
     const spec = options.handler;
@@ -49,6 +52,26 @@ class SdkBotUnderTest implements BotUnderTest {
       await ctx.reply(spec.replyText ?? ctx.message.text, mentions ? { mentions } : {});
     });
 
+    if (spec.recordAttachments) {
+      this.bot.on("attachment", async (ctx) => {
+        const attachments: Json[] = [];
+        for (const attachment of ctx.message.attachments ?? []) {
+          const seen = wireAttachment(attachment);
+          if (spec.downloadAttachments) seen["downloadedBytes"] = await countBytes(await ctx.client.download(attachment));
+          attachments.push(seen);
+        }
+        // Back into wire names, so the case can compare one shape across
+        // languages (SCHEMA.md, attachmentsSeen).
+        this.attachmentsSeen.push({
+          updateId: ctx.update.updateId,
+          text: ctx.message.text,
+          caption: ctx.message.caption ?? "",
+          attachmentsTruncated: ctx.message.attachmentsTruncated ?? false,
+          attachments,
+        });
+      });
+    }
+
     for (const [name, text] of Object.entries(spec.commands ?? {})) {
       this.bot.command(name, async (ctx) => {
         await ctx.reply(text);
@@ -73,6 +96,27 @@ class SdkBotUnderTest implements BotUnderTest {
   stop(): Promise<void> {
     return this.bot.stop();
   }
+}
+
+function wireAttachment(a: Attachment): Record<string, Json> {
+  const wire: Record<string, Json> = {
+    file_id: a.fileId,
+    kind: a.kind,
+    file_name: a.fileName,
+    mime_type: a.mimeType,
+    file_size: a.fileSize,
+    url: a.url,
+  };
+  if (a.width !== undefined) wire["width"] = a.width;
+  if (a.height !== undefined) wire["height"] = a.height;
+  if (a.duration !== undefined) wire["duration"] = a.duration;
+  return wire;
+}
+
+async function countBytes(stream: ReadableStream<Uint8Array>): Promise<number> {
+  let total = 0;
+  for await (const chunk of stream) total += chunk.byteLength;
+  return total;
 }
 
 function toReported(error: unknown): ReportedError {

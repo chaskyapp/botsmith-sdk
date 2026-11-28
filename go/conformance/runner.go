@@ -1,7 +1,9 @@
 package conformance
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -73,7 +75,41 @@ func RunCase(c Case, factory Factory) []Failure {
 
 	failures := checkRequests(c, fake)
 	failures = append(failures, checkAssertions(c, bot, secondStartRejected, stopDuration)...)
+	failures = append(failures, checkAttachmentsSeen(c, bot, fake.BaseURL())...)
 	return failures
+}
+
+// checkAttachmentsSeen compares exactly, not partially: a field the SDK dropped
+// or converted is the defect this assertion exists to catch (G14).
+func checkAttachmentsSeen(c Case, bot BotUnderTest, baseURL string) []Failure {
+	if c.Assert.AttachmentsSeen == nil {
+		return nil
+	}
+	var actual []any
+	if recorder, ok := bot.(AttachmentRecorder); ok {
+		actual = recorder.AttachmentsSeen()
+	}
+	want := canonicalJSON(bytes.ReplaceAll(c.Assert.AttachmentsSeen, []byte("{baseUrl}"), []byte(baseURL)))
+	encoded, _ := json.Marshal(actual)
+	if actual == nil {
+		encoded = []byte("[]")
+	}
+	got := canonicalJSON(encoded)
+	if want == got {
+		return nil
+	}
+	return []Failure{{Where: "assert.attachmentsSeen", Detail: fmt.Sprintf("expected %s, got %s", want, got)}}
+}
+
+// canonicalJSON re-encodes through any, which sorts object keys, so two equal
+// values print the same.
+func canonicalJSON(raw []byte) string {
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return string(raw)
+	}
+	out, _ := json.Marshal(v)
+	return string(out)
 }
 
 // RunManagementCase drives a case against a specific management client, so a

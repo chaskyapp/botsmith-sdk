@@ -3,7 +3,7 @@
   "contractVersion": "1.0",
   "guarantee": "G10",
   "title": "A chat type, an update type or a field the SDK does not know reaches the author without an error",
-  "why": "The server grows the update without asking the bots first: group chats arrived as chat.type \"group\" with title, is_bot, mentions and reply_to_message, then my_chat_member arrived as an update with no message at all, and files and reactions are next. A bot that was never updated must keep working through every one of those. An SDK that validates chat.type against what it knew, drops an update it cannot classify, or crashes reading update.message, turns each server release into an outage for every bot that did not ship in lockstep.",
+  "why": "The server grows the update without asking the bots first: group chats arrived as chat.type \"group\" with title, is_bot, mentions and reply_to_message, then my_chat_member arrived as an update with no message at all, then attachments, and reactions and polls are next. A bot that was never updated must keep working through every one of those. An SDK that validates chat.type against what it knew, drops an update it cannot classify, or crashes reading update.message, turns each server release into an outage for every bot that did not ship in lockstep.",
   "bot": {
     "transport": "polling",
     "options": {
@@ -74,13 +74,10 @@
                 },
                 "date": 1795800090,
                 "text": "seven",
-                "attachments": [
-                  {
-                    "file_id": "f1",
-                    "kind": "document"
-                  }
-                ],
-                "attachments_truncated": false
+                "poll": {
+                  "id": "p1",
+                  "question": "Lunch at one?"
+                }
               }
             }
           ]

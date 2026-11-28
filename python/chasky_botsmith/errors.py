@@ -33,6 +33,20 @@ class TransportError(ChaskyError):
     """
 
 
+class DownloadError(ChaskyError):
+    """Downloading an attachment answered something other than 2xx.
+
+    Not an APIError: the media store has no envelope. A 403 or 404 usually
+    means the url expired, and it cannot be renewed: there is no getFile (G14).
+    """
+
+    def __init__(self, status: int, where: str) -> None:
+        super().__init__(f"download of {where} failed: HTTP {status}")
+        self.status = status
+        #: The url without its query, which may hold a signature.
+        self.url = where
+
+
 class UsageError(ChaskyError):
     """Raised locally, before spending a request."""
 

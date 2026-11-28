@@ -24,6 +24,8 @@ export interface CannedResponse {
   /** The fake fails the connection instead of answering. May contain {url}. */
   transportError?: string;
   delayMs?: number;
+  /** Sent verbatim as application/octet-stream instead of a JSON body (G14). */
+  rawBody?: string;
 }
 
 export interface Exchange {
@@ -46,6 +48,10 @@ export interface HandlerSpec {
   mentionBack?: boolean;
   /** `{ "<name>": "<reply text>" }`: each name is a command that replies with that text (G13). */
   commands?: Record<string, string>;
+  /** Register an attachment handler that records what it received (G14). */
+  recordAttachments?: boolean;
+  /** That handler also downloads every attachment and records the byte count. */
+  downloadAttachments?: boolean;
 }
 
 export interface ManagementCall {
@@ -77,6 +83,8 @@ export interface Assertions {
   secondStartRejected?: boolean;
   /** stop() returned within this many milliseconds (G8). */
   stoppedWithinMs?: number;
+  /** Every run of the attachment handler, in order, compared exactly (G14). */
+  attachmentsSeen?: Json[];
 }
 
 export interface ConformanceCase {

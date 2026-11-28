@@ -19,6 +19,8 @@ const STEADY_STATE_POLL_MS = 25;
 export class FakeServer {
   private server: Server | null = null;
   private index = 0;
+  /** Kept after stop(): a response still in flight may need it for {baseUrl}. */
+  private listeningAt = "";
 
   readonly observed: ObservedRequest[] = [];
   readonly extras: ObservedRequest[] = [];
@@ -39,6 +41,7 @@ export class FakeServer {
   async start(): Promise<void> {
     this.server = createServer((req, res) => void this.handle(req, res));
     await new Promise<void>((resolve) => this.server!.listen(0, "127.0.0.1", resolve));
+    this.listeningAt = this.baseUrl;
   }
 
   async stop(): Promise<void> {
@@ -92,8 +95,14 @@ export class FakeServer {
       return;
     }
 
+    if (respond.rawBody !== undefined) {
+      res.writeHead(respond.status ?? 200, { "content-type": "application/octet-stream" });
+      res.end(respond.rawBody);
+      return;
+    }
     res.writeHead(respond.status ?? 200, { "content-type": "application/json" });
-    res.end(JSON.stringify(respond.body ?? null));
+    // {baseUrl} lets a case hand the SDK a URL back to this fake (G14).
+    res.end(JSON.stringify(respond.body ?? null).replaceAll("{baseUrl}", this.listeningAt));
   }
 }
 

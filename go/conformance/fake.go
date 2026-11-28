@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -71,7 +72,9 @@ func (f *FakeServer) handle(w http.ResponseWriter, r *http.Request) {
 			body = string(raw)
 		}
 	}
-	record := ObservedRequest{Method: r.Method, Path: r.URL.Path, Headers: headers, Body: body, ReceivedAt: receivedAt}
+	// RequestURI, not Path: the runner splits the query off itself, and with
+	// Path alone expect.query had nothing to match against.
+	record := ObservedRequest{Method: r.Method, Path: r.URL.RequestURI(), Headers: headers, Body: body, ReceivedAt: receivedAt}
 
 	f.mu.Lock()
 	last := Exchange{}
@@ -127,7 +130,15 @@ func (f *FakeServer) handle(w http.ResponseWriter, r *http.Request) {
 	if status == 0 {
 		status = http.StatusOK
 	}
+	if raw := exchange.Respond.RawBody; raw != nil {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, *raw)
+		return
+	}
+	encoded, _ := json.Marshal(exchange.Respond.Body)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(exchange.Respond.Body)
+	// {baseUrl} lets a case hand the SDK a URL back to this fake (G14).
+	_, _ = w.Write(bytes.ReplaceAll(encoded, []byte("{baseUrl}"), []byte(f.server.URL)))
 }

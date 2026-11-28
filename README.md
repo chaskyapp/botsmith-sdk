@@ -1,6 +1,6 @@
 # botsmith-sdk — Client SDKs for the Chasky Bot API
 
-**Status: implemented in TypeScript, Go and Python — 26/26 conformance each.**
+**Status: implemented in TypeScript, Go and Python — 28/28 conformance each.**
 
 Monorepo for the SDKs a bot author installs to talk to the Chasky Bot API —
 filling the role `telegraf` and `python-telegram-bot` fill for Telegram.
@@ -13,9 +13,9 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 26/26 conformance |
-| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 26/26 conformance |
-| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 26/26 conformance |
+| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 28/28 conformance |
+| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 28/28 conformance |
+| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 28/28 conformance |
 
 ## Administration is a separate package, on purpose
 
@@ -48,7 +48,7 @@ contract). What keeps them apart now is cadence: administration follows the
 server's deltas, the runtime does not, and a change in one should never force a
 release of the other.
 
-All three pass the same 26 cases. The order was TypeScript → Go → Python, for
+All three pass the same 28 cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
 single consumer**, and Go was the cheapest second port because the team already
 writes it.
@@ -65,7 +65,7 @@ case is not a tested runner.
 - **[docs/01-organization.md](docs/01-organization.md)** — how that contract
   survives three implementations without drifting: layout, what is invariant and
   what is idiomatic, conformance suite, versioning, work order.
-- **[conformance/](conformance/)** — 26 shared cases that turn the guarantees
+- **[conformance/](conformance/)** — 28 shared cases that turn the guarantees
   into failing tests. They get written **before** any SDK, and every guarantee in
   the contract has at least one.
 
@@ -181,6 +181,33 @@ and resends the same message with the **same** `Idempotency-Key`, so the retry
 can never post twice; a `429` never stops the bot (G11). A send that is still
 refused after the SDK's attempts reaches the author as an error carrying the
 wait the server asked for.
+
+## Files
+
+A person can send a bot a document, a photo, a video, an audio or a voice
+note, in a 1:1 or in a group. Such a message arrives with an **empty `text`**:
+what they wrote goes in `caption`, and the files in `attachments` (at most 10;
+`attachmentsTruncated` says there were more). It goes to the **attachment
+handler**, never to the text or command handlers (G14).
+
+| Field | |
+|---|---|
+| `fileId` | opaque, like every id |
+| `kind` | `image`, `video`, `audio`, `voice` or `document`; a free string |
+| `fileName`, `mimeType`, `fileSize` | as stored; size in bytes |
+| `url` | where to download it. **It may expire within hours**: download on arrival, do not store it. There is no `getFile` |
+| `width`, `height`, `duration` | only when the server knows them |
+
+The download helper streams the file from `url` exactly as received and never
+sends the bot token, which the media store has no business seeing. A non-2xx
+answer is a download error with the status; `403` or `404` usually means the
+url expired.
+
+| | TypeScript | Go | Python |
+|---|---|---|---|
+| Attachment handler | `bot.on("attachment", fn)` | `bot.HandleAttachment(fn)` | `@bot.on_attachment` |
+| Download | `await client.download(a)` → `ReadableStream` | `client.Download(ctx, a)` → `io.ReadCloser` | `async with client.download(a) as chunks:` |
+| Download failure | `ChaskyDownloadError.status` | `*chaskybot.DownloadError` `.Status` | `DownloadError.status` |
 
 ## Decisions
 

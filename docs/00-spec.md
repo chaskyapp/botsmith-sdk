@@ -692,6 +692,15 @@ to read in full before writing a bot.
   what counts as a command in read mode `mentions`, so the bot and the server
   never disagree about it. The username comes from `getMe`, asked once, the
   first time a suffixed command needs it. (`g13`)
+- **G14 — An attachment reaches the attachment handler whole.** A message that
+  carries attachments arrives with an empty `text`, what was written in
+  `caption`, at most 10 `attachments` and `attachments_truncated` when there
+  were more. It goes to the attachment handler, never to the text or command
+  handlers, which would see an empty string. Every field of every attachment
+  arrives, `file_id` as the string it was (G9) and `kind` as free text (G10).
+  The download helper fetches `url` exactly as received, streamed and without
+  the bot token: it points at the media store, may be signed, and expires
+  within hours. There is no `getFile`. (`g14` pair)
 
 #### Administration (M1–M5)
 

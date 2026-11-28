@@ -73,6 +73,7 @@ type Bot struct {
 	running        bool
 	commands       map[string]Handler
 	handlers       []Handler
+	attachments    []Handler
 	updateHandlers []func(ctx context.Context, u *Update) error
 	onErrors       []func(error)
 	// username is learned from getMe the first time a suffixed command needs
@@ -110,6 +111,16 @@ func (b *Bot) Handle(h Handler) *Bot {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.handlers = append(b.handlers, h)
+	return b
+}
+
+// HandleAttachment registers a handler for a message that carries
+// attachments. It runs instead of the command and text handlers: such a
+// message has an empty Text, and what was written is Caption (G14).
+func (b *Bot) HandleAttachment(h Handler) *Bot {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.attachments = append(b.attachments, h)
 	return b
 }
 
@@ -186,6 +197,20 @@ func (b *Bot) dispatch(ctx context.Context, update Update) error {
 		client:   b.client,
 		attempts: b.attempts,
 		onError:  b.emitError,
+	}
+
+	if len(update.Message.Attachments) > 0 {
+		// Never the text handler: it would see "" and answer a file as if it
+		// were an empty message (G14).
+		b.mu.Lock()
+		handlers := append([]Handler{}, b.attachments...)
+		b.mu.Unlock()
+		for _, fn := range handlers {
+			if err := fn(ctx, event); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	handler, err := b.commandHandler(ctx, update.Message.Text)

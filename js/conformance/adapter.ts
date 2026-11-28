@@ -1,4 +1,4 @@
-import type { HandlerSpec } from "./types.js";
+import type { HandlerSpec, Json } from "./types.js";
 
 /**
  * The contract between the conformance runner and an SDK under test.
@@ -28,6 +28,11 @@ export interface BotUnderTest {
   readonly errors: readonly ReportedError[];
   /** Warnings surfaced to the author, in order. */
   readonly warnings: readonly string[];
+  /**
+   * What the attachment handler received, translated back into wire names
+   * (SCHEMA.md, `attachmentsSeen`). Absent when the bot has no such handler.
+   */
+  readonly attachmentsSeen?: readonly Json[];
 }
 
 export interface BotUnderTestOptions {

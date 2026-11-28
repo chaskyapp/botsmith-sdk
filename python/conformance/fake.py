@@ -111,6 +111,9 @@ class FakeServer:
                         pass
                     return
 
+                if respond.get("rawBody") is not None:
+                    self._respond_raw(respond.get("status", 200), respond["rawBody"].encode())
+                    return
                 self._respond(respond.get("status", 200), respond.get("body"))
 
             # BaseHTTPRequestHandler dispatches by method name and answers 501 for
@@ -127,8 +130,18 @@ class FakeServer:
             do_PATCH = _handle  # noqa: N815
             do_DELETE = _handle  # noqa: N815
 
+            def _respond_raw(self, status: int, data: bytes) -> None:
+                """A file, not an envelope: the media store a url points at (G14)."""
+                self.send_response(status)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
             def _respond(self, status: int, payload: Any) -> None:
-                encoded = json.dumps(payload).encode()
+                # {baseUrl} lets a case hand the SDK a URL back to this fake.
+                host, port = self.server.server_address[:2]
+                encoded = json.dumps(payload).replace("{baseUrl}", f"http://{host}:{port}").encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(encoded)))

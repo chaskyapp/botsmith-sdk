@@ -1,0 +1,125 @@
+{
+  "id": "g14-attachment-downloads-from-its-url-without-the-token",
+  "contractVersion": "1.0",
+  "guarantee": "G14",
+  "title": "The download helper fetches an attachment's url as given, streams its bytes, and never sends the bot token",
+  "why": "There is no getFile (decision A16 of the server's SDD): the url in the update is the only way to the file, and when media URLs are signed it expires within hours, so the bot downloads it on arrival. The url is used exactly as received: a helper that rebuilds it, drops its query or re-encodes it breaks the signature and the storage answers 403. The url points at the media store, not at the Bot API, so the request must not carry the bot token in any form; a helper that reuses the API's path or headers hands the token to a third party.",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "noop",
+      "recordAttachments": true,
+      "downloadAttachments": true
+    }
+  },
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1795800085,
+                "text": "",
+                "attachments": [
+                  {
+                    "file_id": "a9",
+                    "kind": "document",
+                    "file_name": "report.pdf",
+                    "mime_type": "application/pdf",
+                    "file_size": 13,
+                    "url": "{baseUrl}/media/2026/11/9f8e/file/report.pdf?X-Amz-Expires=21600&X-Amz-Signature=s1"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "GET",
+        "path": "/media/2026/11/9f8e/file/report.pdf",
+        "query": {
+          "X-Amz-Expires": "21600",
+          "X-Amz-Signature": "s1"
+        },
+        "headers": {
+          "Authorization": "$absent",
+          "Idempotency-Key": "$absent"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "rawBody": "%PDF-1.7 fake"
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 6
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false,
+    "errorsReported": [],
+    "attachmentsSeen": [
+      {
+        "updateId": 5,
+        "text": "",
+        "caption": "",
+        "attachmentsTruncated": false,
+        "attachments": [
+          {
+            "file_id": "a9",
+            "kind": "document",
+            "file_name": "report.pdf",
+            "mime_type": "application/pdf",
+            "file_size": 13,
+            "url": "{baseUrl}/media/2026/11/9f8e/file/report.pdf?X-Amz-Expires=21600&X-Amz-Signature=s1",
+            "downloadedBytes": 13
+          }
+        ]
+      }
+    ]
+  },
+  "run": {
+    "timeoutMs": 3000
+  }
+}

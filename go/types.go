@@ -70,13 +70,45 @@ type Message struct {
 	From User
 	Chat Chat
 	// The wire carries seconds since the epoch.
-	Date    time.Time
+	Date time.Time
+	// Text is empty when the message carries attachments: what was written
+	// with them is Caption.
 	Text    string
 	ReplyTo *ReplyTo
 	// Mentions are the people the message names, ids exactly as received (G12).
 	Mentions []Mention
 	// Mentioned is true only when THIS bot is among the mentions.
 	Mentioned bool
+	// Caption is the text sent with the attachments; empty when there was none.
+	Caption string
+	// Attachments holds at most 10 files (G14).
+	Attachments []Attachment
+	// AttachmentsTruncated reports that the message had more than the 10
+	// attachments delivered.
+	AttachmentsTruncated bool
+}
+
+// Attachment is a file attached to a message (G14).
+//
+// URL is the only way to the file: there is no getFile. It may expire within
+// hours, so download it when the update arrives (Client.Download) and do not
+// store it.
+type Attachment struct {
+	// FileID is opaque, like every identifier (G9).
+	FileID string
+	// Kind is image, video, audio, voice or document today. A string on
+	// purpose: a kind this version does not know still arrives (G10).
+	Kind     string
+	FileName string
+	MimeType string
+	// FileSize is in bytes.
+	FileSize int64
+	URL      string
+	// Width and Height are set for images and videos when the server knows
+	// them; zero otherwise.
+	Width, Height int
+	// Duration is in seconds, for audio, voice and video; zero when unknown.
+	Duration int
 }
 
 // Mention is one person a message names. UserID is an opaque string: the server
@@ -176,12 +208,27 @@ type wireMessage struct {
 		UserID string `json:"user_id"`
 		Name   string `json:"name"`
 	} `json:"mentions"`
-	Mentioned bool `json:"mentioned"`
-	ReplyTo   *struct {
+	Mentioned            bool             `json:"mentioned"`
+	Caption              string           `json:"caption"`
+	Attachments          []wireAttachment `json:"attachments"`
+	AttachmentsTruncated bool             `json:"attachments_truncated"`
+	ReplyTo              *struct {
 		MessageID string    `json:"message_id"`
 		From      *wireUser `json:"from"`
 		Text      string    `json:"text"`
 	} `json:"reply_to_message"`
+}
+
+type wireAttachment struct {
+	FileID   string `json:"file_id"`
+	Kind     string `json:"kind"`
+	FileName string `json:"file_name"`
+	MimeType string `json:"mime_type"`
+	FileSize int64  `json:"file_size"`
+	URL      string `json:"url"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+	Duration int    `json:"duration"`
 }
 
 type wireUpdate struct {
@@ -234,6 +281,11 @@ func (m *wireMessage) toMessage() *Message {
 	out.Mentioned = m.Mentioned
 	for _, mention := range m.Mentions {
 		out.Mentions = append(out.Mentions, Mention{UserID: mention.UserID, Name: mention.Name})
+	}
+	out.Caption = m.Caption
+	out.AttachmentsTruncated = m.AttachmentsTruncated
+	for _, a := range m.Attachments {
+		out.Attachments = append(out.Attachments, Attachment(a))
 	}
 	if r := m.ReplyTo; r != nil {
 		out.ReplyTo = &ReplyTo{MessageID: r.MessageID, From: r.From.toUser(), Text: r.Text}

@@ -35,6 +35,22 @@ func (e *TransportError) Error() string {
 }
 func (e *TransportError) Unwrap() error { return e.cause }
 
+// DownloadError means downloading an attachment answered something other
+// than 2xx. It is not an APIError: the media store has no envelope. A 403 or
+// 404 usually means the URL expired, and it cannot be renewed: there is no
+// getFile (G14).
+type DownloadError struct {
+	// Status is the HTTP status the media store answered.
+	Status int
+	// URL is the attachment's URL without its query, which may hold a
+	// signature.
+	URL string
+}
+
+func (e *DownloadError) Error() string {
+	return fmt.Sprintf("download of %s failed: HTTP %d", e.URL, e.Status)
+}
+
 // UsageError is raised locally, before spending a request.
 type UsageError struct{ Message string }
 

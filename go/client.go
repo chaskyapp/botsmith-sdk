@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -38,7 +39,11 @@ type Client struct {
 	token   string
 	baseURL string
 	http    *http.Client
-	warn    func(string)
+	// transfer is http without its overall timeout, for file transfers: that
+	// timeout covers the whole body, and a large file takes longer than the
+	// longest poll. The context bounds these instead.
+	transfer *http.Client
+	warn     func(string)
 }
 
 func NewClient(opts Options) (*Client, error) {
@@ -60,7 +65,9 @@ func NewClient(opts Options) (*Client, error) {
 		httpClient = &http.Client{Timeout: (MaxTimeoutSeconds + 15) * time.Second}
 	}
 
-	c := &Client{token: opts.Token, baseURL: base, http: httpClient, warn: warn}
+	transfer := *httpClient
+	transfer.Timeout = 0
+	c := &Client{token: opts.Token, baseURL: base, http: httpClient, transfer: &transfer, warn: warn}
 
 	// D8: warn ONCE, at construction. A warning per poll is noise that ends up
 	// filtered out of a grep, which is the same as no warning at all.
@@ -185,6 +192,44 @@ func (c *Client) GetWebhookInfo(ctx context.Context) (WebhookInfo, error) {
 func (c *Client) SendChatAction(ctx context.Context, chatID ChatID, action ChatAction) error {
 	var ok bool
 	return c.call(ctx, "sendChatAction", map[string]any{"chat_id": chatID, "action": action}, nil, &ok)
+}
+
+// Download streams an attachment's bytes from its URL (G14). The caller must
+// close the reader.
+//
+// The URL is fetched exactly as received: it may carry a signature that
+// rebuilding it would break. It points at the media store, not at the Bot API,
+// so the request carries no token. Nothing is buffered, and ctx bounds the
+// whole transfer: the client's overall timeout does not apply to it.
+func (c *Client) Download(ctx context.Context, a Attachment) (io.ReadCloser, error) {
+	where := withoutQuery(a.URL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.URL, nil)
+	if err != nil {
+		return nil, &TransportError{Method: "download", cause: hideURL(err, a.URL, where, c.token)}
+	}
+	resp, err := c.transfer.Do(req)
+	if err != nil {
+		return nil, &TransportError{Method: "download", cause: hideURL(err, a.URL, where, c.token)}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		_ = resp.Body.Close()
+		return nil, &DownloadError{Status: resp.StatusCode, URL: where}
+	}
+	return resp.Body, nil
+}
+
+// withoutQuery drops the query and fragment, which may hold a signature that
+// grants access to the file.
+func withoutQuery(raw string) string {
+	if cut := strings.IndexAny(raw, "?#"); cut >= 0 {
+		return raw[:cut]
+	}
+	return raw
+}
+
+// hideURL keeps a signed URL's query out of an error message, like the token.
+func hideURL(err error, full, shown, token string) error {
+	return &redactedError{msg: redactText(strings.ReplaceAll(err.Error(), full, shown), token), cause: err}
 }
 
 func (c *Client) clampLimit(limit int) (int, error) {
