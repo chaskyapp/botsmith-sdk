@@ -71,7 +71,9 @@ func (f *FakeServer) handle(w http.ResponseWriter, r *http.Request) {
 			body = string(raw)
 		}
 	}
-	record := ObservedRequest{Method: r.Method, Path: r.URL.Path, Headers: headers, Body: body, ReceivedAt: receivedAt}
+	// RequestURI, not Path: the runner splits the query off itself, and with
+	// Path alone expect.query had nothing to match against.
+	record := ObservedRequest{Method: r.Method, Path: r.URL.RequestURI(), Headers: headers, Body: body, ReceivedAt: receivedAt}
 
 	f.mu.Lock()
 	last := Exchange{}
