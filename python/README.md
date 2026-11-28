@@ -16,6 +16,7 @@ The guarantees are identical to the other two SDKs; the shape is Python's.
 | Handlers | `bot.on("text", fn)` | `bot.Handle(fn)` | `@bot.on_text` |
 | Every update | `bot.on("update", fn)` | `bot.HandleUpdate(fn)` | `@bot.on_update` |
 | Attachments | `bot.on("attachment", fn)` | `bot.HandleAttachment(fn)` | `@bot.on_attachment`, then `client.download(a)` |
+| Send a file | `ctx.replyWithDocument(fileFromPath(p))` | `e.ReplyDocument(ctx, file, opts)` | `event.reply_document(InputFile.from_path(p))` |
 | Reply with mentions | `ctx.reply(text, { mentions })` | `e.ReplyWith(ctx, text, opts)` | `event.reply(text, mentions=...)` |
 | Entry point | `await bot.start()` | `bot.Run(ctx)` | `await bot.run()` |
 | Conformance | a CLI | `go test` | `unittest` |

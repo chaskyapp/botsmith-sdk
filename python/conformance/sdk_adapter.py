@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import shutil
+import tempfile
 
 from typing import Any
 
-from chasky_botsmith import APIError, Attachment, Bot, Event, Polling, Update
+from chasky_botsmith import APIError, Attachment, Bot, Event, InputFile, Polling, Update
 
 from .runner import BotOptions, BotUnderTest, ReportedError
 
@@ -21,6 +24,17 @@ class SDKBot:
         self._task: asyncio.Task[None] | None = None
 
         spec = options.handler
+        self._scratch: str | None = None
+        document: InputFile | None = None
+        if spec.get("replyDocument"):
+            # Sparse: the size is what the case is about, and a 100 MB file of
+            # holes costs no disk and no time to create.
+            reply = spec["replyDocument"]
+            self._scratch = tempfile.mkdtemp(prefix="botsmith-conformance-")
+            path = os.path.join(self._scratch, reply["fileName"])
+            with open(path, "wb") as handle:
+                handle.truncate(reply["bytes"])
+            document = InputFile.from_path(path)
         self._bot = Bot(
             options.token,
             base_url=options.base_url,
@@ -46,6 +60,9 @@ class SDKBot:
             if update_id in (spec.get("throwOnUpdateIds") or []):
                 raise RuntimeError(f"handler failed on update {update_id}")
             if spec.get("kind") == "noop":
+                return
+            if document is not None:
+                await event.reply_document(document, caption=spec["replyDocument"].get("caption"))
                 return
             # No mentions at all when the message had none: the SDK must not
             # send the key empty (G12).
@@ -119,6 +136,8 @@ class SDKBot:
             except (asyncio.CancelledError, Exception):  # noqa: BLE001
                 pass
         await self._bot.aclose()
+        if self._scratch is not None:
+            shutil.rmtree(self._scratch, ignore_errors=True)
 
     def _record(self, error: BaseException) -> None:
         code = error.code if isinstance(error, APIError) else None

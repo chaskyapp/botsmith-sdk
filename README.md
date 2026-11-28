@@ -1,6 +1,6 @@
 # botsmith-sdk — Client SDKs for the Chasky Bot API
 
-**Status: implemented in TypeScript, Go and Python — 28/28 conformance each.**
+**Status: implemented in TypeScript, Go and Python — 31/31 conformance each.**
 
 Monorepo for the SDKs a bot author installs to talk to the Chasky Bot API —
 filling the role `telegraf` and `python-telegram-bot` fill for Telegram.
@@ -13,9 +13,9 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 28/28 conformance |
-| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 28/28 conformance |
-| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 28/28 conformance |
+| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 31/31 conformance |
+| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 31/31 conformance |
+| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 31/31 conformance |
 
 ## Administration is a separate package, on purpose
 
@@ -48,7 +48,7 @@ contract). What keeps them apart now is cadence: administration follows the
 server's deltas, the runtime does not, and a change in one should never force a
 release of the other.
 
-All three pass the same 28 cases. The order was TypeScript → Go → Python, for
+All three pass the same 31 cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
 single consumer**, and Go was the cheapest second port because the team already
 writes it.
@@ -65,7 +65,7 @@ case is not a tested runner.
 - **[docs/01-organization.md](docs/01-organization.md)** — how that contract
   survives three implementations without drifting: layout, what is invariant and
   what is idiomatic, conformance suite, versioning, work order.
-- **[conformance/](conformance/)** — 28 shared cases that turn the guarantees
+- **[conformance/](conformance/)** — 31 shared cases that turn the guarantees
   into failing tests. They get written **before** any SDK, and every guarantee in
   the contract has at least one.
 
@@ -208,6 +208,49 @@ url expired.
 | Attachment handler | `bot.on("attachment", fn)` | `bot.HandleAttachment(fn)` | `@bot.on_attachment` |
 | Download | `await client.download(a)` → `ReadableStream` | `client.Download(ctx, a)` → `io.ReadCloser` | `async with client.download(a) as chunks:` |
 | Download failure | `ChaskyDownloadError.status` | `*chaskybot.DownloadError` `.Status` | `DownloadError.status` |
+
+**Sending a file.** `sendDocument` sends one file of up to **100 MB** with an
+optional `caption` (1024 characters, where `mentions` name people). It streams
+the file as `multipart/form-data` with a `Content-Length`, never loading it
+whole into memory. The server decides the type from the bytes: PDF, docx, xlsx,
+png, jpg, webp, m4a and video; anything else is `400 UNSUPPORTED_FILE_TYPE`.
+
+- A file over 100 MB, or empty, is refused **by the SDK**, before any request,
+  with a usage error naming `FILE_TOO_LARGE` or `FILE_REQUIRED`.
+- The reply shortcut retries a transient failure by sending the whole file
+  again, read from its start, with the **same** `Idempotency-Key`, so the
+  server answers the first message instead of posting a second one.
+- A `413 FILE_TOO_LARGE` from the server is never resent (G15).
+- A `503 FILE_UPLOAD_UNAVAILABLE` means the server has no file storage
+  configured. Like any `5xx` it is retried within the send's attempts, then
+  reaches the author.
+
+| | TypeScript | Go | Python |
+|---|---|---|---|
+| A file on disk | `fileFromPath(path)` | `chaskybot.FileFromPath(path)` | `InputFile.from_path(path)` |
+| Bytes in memory | `fileFromBytes(data, name)` | `chaskybot.FileFromBytes(name, data)` | `InputFile.from_bytes(data, name)` |
+| Reply with it | `ctx.replyWithDocument(file, { caption })` | `e.ReplyDocument(ctx, file, chaskybot.DocumentOptions{Caption: c})` | `event.reply_document(file, caption=...)` |
+| Raw call | `client.sendDocument({ chatId, document })` | `client.SendDocument(ctx, params)` | `client.send_document(chat_id=..., document=...)` |
+
+**Known limitation, Python only.** When the server answers before reading the
+whole body (a `413`, or a `429` or `401` it decides from the headers) and
+closes the connection, asyncio drops that answer once the upload fails to
+write, so the Python SDK reports a transport error instead of the code. A
+transport error is transient, so the send is retried with the same key and the
+backoff, not `retry_after`. TypeScript and Go read the answer while they
+upload and report the code. Files that fit in the socket buffer, a few hundred
+KB, are not affected.
+
+A file from somewhere else (an attachment being forwarded, a generated report)
+is any object with a name, a size known in advance, and an `open` that yields
+its bytes from the start every time it is called.
+
+| Code | Description | When |
+|---|---|---|
+| 413 | `FILE_TOO_LARGE` | Over 100 MB (the SDK refuses it first) |
+| 400 | `FILE_REQUIRED` | No file, or an empty one (the SDK refuses it first) |
+| 400 | `UNSUPPORTED_FILE_TYPE` | A type outside the list above, detected from the bytes |
+| 503 | `FILE_UPLOAD_UNAVAILABLE` | The environment has no file storage |
 
 ## Decisions
 

@@ -1,0 +1,114 @@
+{
+  "contractVersion": "1.0",
+  "guarantee": "G15",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply",
+      "replyDocument": {
+        "fileName": "report.pdf",
+        "bytes": 2048,
+        "caption": "Q3"
+      }
+    }
+  },
+  "run": {
+    "timeoutMs": 3000
+  },
+  "id": "g15-413-on-a-document-is-not-retried",
+  "title": "A 413 FILE_TOO_LARGE on sendDocument reaches the author and is not resent",
+  "why": "413 means the server will never accept this file, however many times it arrives. Treating it as transient, like a 5xx, uploads up to a hundred megabytes again and again for the same answer, and holds the bot's handler for minutes while it does. It is a business error of that one send: the author hears about it, the bot lives on and keeps polling.",
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1795800085,
+                "text": "send me the report"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendDocument",
+        "headers": {
+          "Idempotency-Key": "$any",
+          "Content-Length": "$any",
+          "Transfer-Encoding": "$absent"
+        },
+        "body": {
+          "chat_id": "bot:bot:b1:u1",
+          "caption": "Q3",
+          "reply_to_message_id": "$absent",
+          "mentions": "$absent",
+          "document": {
+            "fileName": "report.pdf",
+            "size": 2048
+          }
+        }
+      },
+      "respond": {
+        "status": 413,
+        "body": {
+          "ok": false,
+          "error_code": 413,
+          "description": "FILE_TOO_LARGE"
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 6
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false,
+    "errorsReported": [
+      {
+        "code": 413
+      }
+    ]
+  }
+}

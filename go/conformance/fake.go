@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"time"
 )
@@ -66,8 +69,14 @@ func (f *FakeServer) handle(w http.ResponseWriter, r *http.Request) {
 	for name := range r.Header {
 		headers[name] = r.Header.Get(name)
 	}
+	// net/http moves these out of Header; put them back so a case can see them.
+	if len(r.TransferEncoding) > 0 {
+		headers["Transfer-Encoding"] = strings.Join(r.TransferEncoding, ", ")
+	}
 	var body any
-	if len(raw) > 0 {
+	if media, params, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err == nil && media == "multipart/form-data" {
+		body = parseMultipart(raw, params["boundary"])
+	} else if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &body); err != nil {
 			body = string(raw)
 		}
@@ -141,4 +150,30 @@ func (f *FakeServer) handle(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(status)
 	// {baseUrl} lets a case hand the SDK a URL back to this fake (G14).
 	_, _ = w.Write(bytes.ReplaceAll(encoded, []byte("{baseUrl}"), []byte(f.server.URL)))
+}
+
+// parseMultipart turns a multipart body into an object: text fields as
+// strings, file parts as {fileName, size} (SCHEMA.md). Anything malformed
+// comes back as the raw text, so the case fails on the field it expected.
+func parseMultipart(raw []byte, boundary string) any {
+	out := map[string]any{}
+	reader := multipart.NewReader(bytes.NewReader(raw), boundary)
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			return out
+		}
+		if err != nil {
+			return string(raw)
+		}
+		data, err := io.ReadAll(part)
+		if err != nil {
+			return string(raw)
+		}
+		if part.FileName() != "" {
+			out[part.FormName()] = map[string]any{"fileName": part.FileName(), "size": float64(len(data))}
+		} else {
+			out[part.FormName()] = string(data)
+		}
+	}
 }

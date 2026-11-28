@@ -11,6 +11,7 @@ from typing import Awaitable, Callable, Mapping
 import httpx
 
 from .client import Client
+from .files import InputFile
 from .errors import UsageError, classify, retry_delay
 from .polling import Polling, Transport, TransportDeps, _backoff
 from .types import BotMessage, ChatID, MessageID, Update, UserID
@@ -47,6 +48,32 @@ class Event:
             attempts=self._attempts,
             on_error=self._on_error,
         )
+
+    async def reply_document(
+        self,
+        document: InputFile,
+        *,
+        caption: str | None = None,
+        reply_to_message_id: MessageID | None = None,
+        mentions: Mapping[str, UserID] | None = None,
+    ) -> BotMessage:
+        """Send a file to this update's chat with a managed Idempotency-Key.
+
+        A transient failure resends the whole file, read again from its start,
+        under the same key; a 413 is not resent (G15).
+        """
+
+        async def send(key: str) -> BotMessage:
+            return await self.client.send_document(
+                chat_id=self.chat_id,
+                document=document,
+                caption=caption,
+                reply_to_message_id=reply_to_message_id,
+                mentions=mentions,
+                idempotency_key=key,
+            )
+
+        return await _with_retry(send, attempts=self._attempts, on_error=self._on_error)
 
     async def typing(self) -> None:
         """Explicit on purpose: the runtime never sends a chat action itself.
@@ -222,17 +249,31 @@ async def _send_with_retry(
     reusing one key across different messages makes the server discard the
     second SILENTLY, which is worse because it looks like it worked.
     """
+
+    async def send(key: str) -> BotMessage:
+        return await client.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_to_message_id=reply_to_message_id,
+            mentions=mentions,
+            idempotency_key=key,
+        )
+
+    return await _with_retry(send, attempts=attempts, on_error=on_error)
+
+
+async def _with_retry(
+    send: Callable[[str], Awaitable[BotMessage]],
+    *,
+    attempts: int,
+    on_error: Callable[[BaseException], None],
+) -> BotMessage:
+    """One logical send: one key, the same on every attempt."""
     key = str(uuid.uuid4())
     last_error: BaseException | None = None
     for attempt in range(1, attempts + 1):
         try:
-            return await client.send_message(
-                chat_id=chat_id,
-                text=text,
-                reply_to_message_id=reply_to_message_id,
-                mentions=mentions,
-                idempotency_key=key,
-            )
+            return await send(key)
         except asyncio.CancelledError:
             raise
         except Exception as error:  # noqa: BLE001 - classify decides

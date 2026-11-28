@@ -412,6 +412,13 @@ def _check_assertions(
                     f"error #{index + 1}: expected code {expected['code']}, got {actual.code}",
                 )
             )
+        if expected.get("contains") and expected["contains"] not in actual.message:
+            failures.append(
+                Failure(
+                    "assert.errorsReported",
+                    f"error #{index + 1}: expected it to mention {expected['contains']}, got {actual.message!r}",
+                )
+            )
         if expected.get("notContains"):
             needle = expected["notContains"].replace("{token}", TEST_TOKEN)
             if needle in actual.message:

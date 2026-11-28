@@ -1,4 +1,5 @@
 import { ChaskyApiError, ChaskyDownloadError, ChaskyTransportError, ChaskyUsageError } from "./errors.js";
+import { MAX_DOCUMENT_BYTES, multipartBody, type InputFile } from "./files.js";
 import { redactError } from "./redact.js";
 import type {
   Attachment,
@@ -55,6 +56,16 @@ export interface SendMessageParams {
    * `{ "<name as it appears in text>": "<user id>" }`. Only active people of the
    * chat, at most 20; otherwise the server answers 400 and writes nothing.
    */
+  mentions?: Record<string, UserID> | undefined;
+}
+
+export interface SendDocumentParams {
+  chatId: ChatID;
+  document: InputFile;
+  /** Up to 1024 characters. */
+  caption?: string | undefined;
+  replyToMessageId?: MessageID | undefined;
+  /** As in sendMessage, naming people as they appear in `caption`. */
   mentions?: Record<string, UserID> | undefined;
 }
 
@@ -124,6 +135,42 @@ export class ChaskyBotClient {
     if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
 
     const raw = await this.call<WireBotMessage>("sendMessage", body, { headers, signal: options.signal });
+    return toBotMessage(raw);
+  }
+
+  /**
+   * Sends a file, streamed as multipart with its length (G15).
+   *
+   * A file over 100 MB, or empty, is refused here without a request. The
+   * server detects the type from the bytes; the name is only what people see.
+   * Each call reads `document` once from its start, so a retry with the same
+   * `idempotencyKey` sends the whole file again.
+   */
+  async sendDocument(
+    params: SendDocumentParams,
+    options: { idempotencyKey?: string | undefined; signal?: AbortSignal | undefined } = {},
+  ): Promise<BotMessage> {
+    const size = await params.document.size();
+    if (size > MAX_DOCUMENT_BYTES) {
+      throw new ChaskyUsageError(
+        `FILE_TOO_LARGE: ${params.document.fileName} is ${size} bytes; the limit is ${MAX_DOCUMENT_BYTES} (100 MB)`,
+      );
+    }
+    if (size <= 0) throw new ChaskyUsageError(`FILE_REQUIRED: ${params.document.fileName} is empty`);
+
+    const fields: Record<string, string> = { chat_id: params.chatId };
+    if (params.caption) fields["caption"] = params.caption;
+    if (params.replyToMessageId !== undefined) fields["reply_to_message_id"] = params.replyToMessageId;
+    // Only when there is something to send, as in sendMessage (G12).
+    if (params.mentions && Object.keys(params.mentions).length > 0) fields["mentions"] = JSON.stringify(params.mentions);
+    const multipart = multipartBody(fields, params.document, size);
+
+    const headers: Record<string, string> = {
+      "content-type": multipart.contentType,
+      "content-length": String(multipart.length),
+    };
+    if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+    const raw = await this.call<WireBotMessage>("sendDocument", multipart.body, { headers, signal: options.signal });
     return toBotMessage(raw);
   }
 
@@ -214,14 +261,18 @@ export class ChaskyBotClient {
     options: { headers?: Record<string, string>; signal?: AbortSignal | undefined },
   ): Promise<T> {
     const url = `${this.baseUrl}/bot${this.token}/${method}`;
+    // A stream is a prepared body (sendDocument); anything else is JSON.
+    const streamed = body instanceof ReadableStream;
     let response: Response;
     try {
       response = await this.doFetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json", ...options.headers },
-        body: JSON.stringify(body),
+        headers: streamed ? { ...options.headers } : { "content-type": "application/json", ...options.headers },
+        body: streamed ? body : JSON.stringify(body),
+        // Required by Node's fetch to send a stream as the body.
+        ...(streamed ? { duplex: "half" } : {}),
         ...(options.signal ? { signal: options.signal } : {}),
-      });
+      } as RequestInit);
     } catch (error) {
       // The URL is in here. Redact before it can reach a log.
       throw new ChaskyTransportError(`${method} could not reach the server: ${describe(error)}`, {

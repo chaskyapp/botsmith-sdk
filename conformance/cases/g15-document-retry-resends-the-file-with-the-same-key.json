@@ -1,0 +1,166 @@
+{
+  "contractVersion": "1.0",
+  "guarantee": "G15",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply",
+      "replyDocument": {
+        "fileName": "report.pdf",
+        "bytes": 2048,
+        "caption": "Q3"
+      }
+    }
+  },
+  "run": {
+    "timeoutMs": 3000
+  },
+  "id": "g15-document-retry-resends-the-file-with-the-same-key",
+  "title": "A sendDocument that failed transiently is resent whole, streamed with its length, under the SAME Idempotency-Key",
+  "why": "A file upload is the request most likely to fail halfway: it is the largest one a bot makes, and the server may have stored the file and created the message before the connection dropped. Retrying with a fresh key posts the document twice, and the second copy is a hundred megabytes nobody asked for. Retrying without the file is a 400. The retry must read the file again from its start and send it with the original key, so the server answers the first message instead of creating another. The body is multipart with a Content-Length, never chunked: the server rejects an oversized upload by its declared length before reading it, and proxies in front of it refuse chunked uploads.",
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1795800085,
+                "text": "send me the report"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendDocument",
+        "headers": {
+          "Idempotency-Key": "$capture:k1",
+          "Content-Length": "$any",
+          "Transfer-Encoding": "$absent"
+        },
+        "body": {
+          "chat_id": "bot:bot:b1:u1",
+          "caption": "Q3",
+          "reply_to_message_id": "$absent",
+          "mentions": "$absent",
+          "document": {
+            "fileName": "report.pdf",
+            "size": 2048
+          }
+        }
+      },
+      "respond": {
+        "status": 500,
+        "body": {
+          "ok": false,
+          "error_code": 500,
+          "description": "INTERNAL_ERROR"
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendDocument",
+        "headers": {
+          "Idempotency-Key": "$same:k1",
+          "Content-Length": "$any",
+          "Transfer-Encoding": "$absent"
+        },
+        "body": {
+          "chat_id": "bot:bot:b1:u1",
+          "caption": "Q3",
+          "reply_to_message_id": "$absent",
+          "mentions": "$absent",
+          "document": {
+            "fileName": "report.pdf",
+            "size": 2048
+          }
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r5",
+            "from": {
+              "id": "bot:b1",
+              "name": "Pepi"
+            },
+            "chat": {
+              "id": "bot:bot:b1:u1",
+              "type": "private"
+            },
+            "date": 1795800086,
+            "text": "",
+            "caption": "Q3",
+            "attachments": [
+              {
+                "file_id": "f1",
+                "kind": "document",
+                "file_name": "report.pdf",
+                "mime_type": "application/pdf",
+                "file_size": 2048,
+                "url": "https://media.example/f1.pdf"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 6
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false,
+    "handlerRuns": [
+      {
+        "updateId": 5,
+        "times": 1
+      }
+    ]
+  }
+}

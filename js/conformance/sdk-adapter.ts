@@ -4,7 +4,11 @@
  * It lives here and not in src/ on purpose: it is test scaffolding, and the
  * publishable package must not carry it (R-C/R-D in §6 of the contract).
  */
+import { mkdtempSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createBot, type Bot } from "../src/bot.js";
+import { fileFromPath } from "../src/files.js";
 import { ChaskyApiError } from "../src/errors.js";
 import { polling } from "../src/polling.js";
 import type { Attachment } from "../src/types.js";
@@ -19,9 +23,19 @@ class SdkBotUnderTest implements BotUnderTest {
   readonly errors: ReportedError[] = [];
   readonly warnings: string[] = [];
   readonly attachmentsSeen: Json[] = [];
+  private readonly scratch: string | undefined;
 
   constructor(options: BotUnderTestOptions) {
     const spec = options.handler;
+    let documentPath: string | undefined;
+    if (spec.replyDocument) {
+      // Sparse: the size is what the case is about, and a 100 MB file of holes
+      // costs no disk and no time to create.
+      this.scratch = mkdtempSync(join(tmpdir(), "botsmith-conformance-"));
+      documentPath = join(this.scratch, spec.replyDocument.fileName);
+      writeFileSync(documentPath, "");
+      truncateSync(documentPath, spec.replyDocument.bytes);
+    }
 
     this.bot = createBot({
       token: options.token,
@@ -46,6 +60,11 @@ class SdkBotUnderTest implements BotUnderTest {
       const id = ctx.update.updateId;
       if (spec.throwOnUpdateIds?.includes(id)) throw new Error(`handler failed on update ${id}`);
       if (spec.kind === "noop") return;
+      if (spec.replyDocument && documentPath) {
+        const { fileName, caption } = spec.replyDocument;
+        await ctx.replyWithDocument(fileFromPath(documentPath, fileName), caption ? { caption } : {});
+        return;
+      }
       const mentions = spec.mentionBack
         ? Object.fromEntries((ctx.message.mentions ?? []).map((m) => [m.name, m.userId]))
         : undefined;
@@ -93,8 +112,9 @@ class SdkBotUnderTest implements BotUnderTest {
     return this.bot.start();
   }
 
-  stop(): Promise<void> {
-    return this.bot.stop();
+  async stop(): Promise<void> {
+    await this.bot.stop();
+    if (this.scratch) rmSync(this.scratch, { recursive: true, force: true });
   }
 }
 

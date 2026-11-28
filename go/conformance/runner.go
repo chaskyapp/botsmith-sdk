@@ -305,6 +305,12 @@ func checkAssertions(c Case, bot BotUnderTest, secondStartRejected bool, stopDur
 				Detail: fmt.Sprintf("error #%d: expected code %d, got %d", i+1, *want.Code, got.Code),
 			})
 		}
+		if want.Contains != "" && !strings.Contains(got.Message, want.Contains) {
+			failures = append(failures, Failure{
+				Where:  "assert.errorsReported",
+				Detail: fmt.Sprintf("error #%d: expected it to mention %s, got %q", i+1, want.Contains, got.Message),
+			})
+		}
 		if want.NotContains != "" {
 			needle := strings.ReplaceAll(want.NotContains, "{token}", TestToken)
 			if strings.Contains(got.Message, needle) {

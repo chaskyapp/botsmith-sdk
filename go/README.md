@@ -45,6 +45,7 @@ The guarantees are identical to the TypeScript SDK; the shape is Go's.
 | Handlers | `bot.on("text", fn)` | `bot.Handle(func(ctx, e) error)` |
 | Every update | `bot.on("update", fn)` | `bot.HandleUpdate(func(ctx, u) error)` |
 | Attachments | `bot.on("attachment", fn)` | `bot.HandleAttachment(fn)`, then `client.Download(ctx, a)` |
+| Send a file | `ctx.replyWithDocument(fileFromPath(p))` | `e.ReplyDocument(ctx, file, DocumentOptions{})` |
 | Reply with mentions | `ctx.reply(text, { mentions })` | `e.ReplyWith(ctx, text, ReplyOptions{Mentions: m})` |
 | Entry point | `await bot.start()` | `bot.Run(ctx)` blocks |
 

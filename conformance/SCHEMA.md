@@ -69,6 +69,10 @@ the format work:
   because the client sent a `?limit=1` it had no opinion about.
 - `body` — **partial match**: declared fields must match, undeclared fields are
   ignored. Use `"$absent"` to require a field is missing.
+  A `multipart/form-data` body is matched as an object too: each text field is
+  a string under its name, and each file part is `{ "fileName", "size" }`, the
+  filename it declared and its length in bytes (G15). The file's bytes are not
+  compared.
 - `headers` — same partial-match rule, header names case-insensitive.
 - `waitedAtLeastMs` — this request must arrive at least this many milliseconds
   after the previous request did. It is how a case says "you were told to
@@ -133,6 +137,7 @@ function. The vocabulary is deliberately tiny; grow it only when a case needs it
 | `mentionBack` | the reply mentions everyone the update mentioned, as `{name: user_id}`, and sends no `mentions` when the update had none (G12) |
 | `recordAttachments` | registers an attachment handler that records what it received, for `assert.attachmentsSeen` (G14) |
 | `downloadAttachments` | that handler also downloads every attachment with the SDK's helper, reading it to the end, and records the byte count (G14) |
+| `replyDocument` | `{ "fileName", "bytes", "caption"? }`: instead of a text, the reply is that document, sent with the SDK's reply shortcut from a file of that many bytes on disk (G15) |
 | `commands` | `{ "<name>": "<reply text>" }`: registers each name as a command whose handler replies with that text. Text that is not a command for this bot reaches the text handler as usual (G13) |
 
 The handler sees **every** update, including kinds the SDK has no type for
@@ -161,7 +166,7 @@ Everything that is not an observed request.
 |---|---|
 | `botStopped` | whether the bot stopped on its own by the end of the run |
 | `handlerRuns` | `[{ "updateId": N, "times": M }]` — exact run counts |
-| `errorsReported` | `[{ "code": N, "notContains": "..." }]` — errors surfaced to the author. An explicit `[]` means none at all; an absent field says nothing |
+| `errorsReported` | `[{ "code": N, "contains": "...", "notContains": "..." }]` — errors surfaced to the author. `contains` is how a case names an error the SDK raised locally, which has no code (G15). An explicit `[]` means none at all; an absent field says nothing |
 | `warnings` | `[{ "contains": "..." }]` — warnings emitted (G6, D8) |
 | `secondStartRejected` | the second `start()` failed locally, without a request (G1) |
 | `stoppedWithinMs` | `stop()` returned within this many milliseconds (G8) |

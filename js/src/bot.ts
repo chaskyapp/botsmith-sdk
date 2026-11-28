@@ -1,5 +1,6 @@
 import { ChaskyBotClient, type ChaskyBotClientOptions } from "./client.js";
 import { ChaskyUsageError, classify, retryDelayMs } from "./errors.js";
+import type { InputFile } from "./files.js";
 import { polling, sleep, type Transport } from "./polling.js";
 import type { BotMessage, ChatID, MessageID, Update, UserID } from "./types.js";
 
@@ -10,6 +11,12 @@ export interface Context {
   readonly client: ChaskyBotClient;
   /** sendMessage to this update's chat, with a managed Idempotency-Key. */
   reply(text: string, options?: ReplyOptions): Promise<BotMessage>;
+  /**
+   * sendDocument to this update's chat, with a managed Idempotency-Key. A
+   * transient failure resends the whole file under the same key; a 413 is not
+   * resent (G15).
+   */
+  replyWithDocument(document: InputFile, options?: DocumentReplyOptions): Promise<BotMessage>;
   /** Explicit on purpose — the runtime never sends a chat action by itself. */
   typing(): Promise<void>;
 }
@@ -18,6 +25,11 @@ export interface ReplyOptions {
   replyToMessageId?: MessageID;
   /** `{ "<name as it appears in text>": "<user id>" }`, as in sendMessage. */
   mentions?: Record<string, UserID>;
+}
+
+export interface DocumentReplyOptions extends ReplyOptions {
+  /** Up to 1024 characters; mentions name people as they appear here. */
+  caption?: string;
 }
 
 export type Handler = (ctx: Context) => void | Promise<void>;
@@ -112,15 +124,35 @@ export function createBot(options: CreateBotOptions): Bot {
       client,
       reply: (text, replyOptions) =>
         sendWithRetry(
-          client,
           // G9: the chat id goes back exactly as it arrived. Never parsed,
           // never coerced — a coerced id addresses the wrong chat silently.
-          {
-            chatId: message.chat.id,
-            text,
-            ...(replyOptions?.replyToMessageId ? { replyToMessageId: replyOptions.replyToMessageId } : {}),
-            ...(replyOptions?.mentions ? { mentions: replyOptions.mentions } : {}),
-          },
+          (send) =>
+            client.sendMessage(
+              {
+                chatId: message.chat.id,
+                text,
+                ...(replyOptions?.replyToMessageId ? { replyToMessageId: replyOptions.replyToMessageId } : {}),
+                ...(replyOptions?.mentions ? { mentions: replyOptions.mentions } : {}),
+              },
+              send,
+            ),
+          { attempts: sendAttempts, signal: controller?.signal, onError: emitError },
+        ),
+      replyWithDocument: (document, replyOptions) =>
+        sendWithRetry(
+          // Each attempt calls document.open() again: the retry is the whole
+          // file, not what was left of the first stream.
+          (send) =>
+            client.sendDocument(
+              {
+                chatId: message.chat.id,
+                document,
+                ...(replyOptions?.caption ? { caption: replyOptions.caption } : {}),
+                ...(replyOptions?.replyToMessageId ? { replyToMessageId: replyOptions.replyToMessageId } : {}),
+                ...(replyOptions?.mentions ? { mentions: replyOptions.mentions } : {}),
+              },
+              send,
+            ),
           { attempts: sendAttempts, signal: controller?.signal, onError: emitError },
         ),
       typing: async () => {
@@ -187,8 +219,7 @@ export function createBot(options: CreateBotOptions): Bot {
  * discard the second SILENTLY, which is worse because it looks like it worked.
  */
 async function sendWithRetry(
-  client: ChaskyBotClient,
-  params: { chatId: ChatID; text: string; replyToMessageId?: MessageID; mentions?: Record<string, UserID> },
+  send: (options: { idempotencyKey: string; signal?: AbortSignal }) => Promise<BotMessage>,
   options: { attempts: number; signal?: AbortSignal | undefined; onError: (error: unknown) => void },
 ): Promise<BotMessage> {
   const idempotencyKey = newIdempotencyKey();
@@ -196,7 +227,7 @@ async function sendWithRetry(
   for (let attempt = 1; attempt <= options.attempts; attempt++) {
     if (options.signal?.aborted) break;
     try {
-      return await client.sendMessage(params, { idempotencyKey, ...(options.signal ? { signal: options.signal } : {}) });
+      return await send({ idempotencyKey, ...(options.signal ? { signal: options.signal } : {}) });
     } catch (error) {
       lastError = error;
       if (classify(error, "call") !== "transient") throw error;

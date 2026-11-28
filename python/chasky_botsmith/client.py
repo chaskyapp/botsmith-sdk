@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .errors import APIError, DownloadError, TransportError, UsageError
+from .files import MAX_DOCUMENT_BYTES, InputFile, mentions_field, multipart_body
 from .redact import redact_exception
 from .types import (
     Attachment,
@@ -125,6 +126,48 @@ class Client:
         headers = {"Idempotency-Key": idempotency_key} if idempotency_key else None
         return message_from_wire(await self._call("sendMessage", body, headers))
 
+    async def send_document(
+        self,
+        *,
+        chat_id: ChatID,
+        document: InputFile,
+        caption: str | None = None,
+        reply_to_message_id: MessageID | None = None,
+        idempotency_key: str | None = None,
+        mentions: Mapping[str, UserID] | None = None,
+    ) -> BotMessage:
+        """Send a file, streamed as multipart with its length (G15).
+
+        A file over 100 MB, or empty, is refused here without a request. The
+        server detects the type from the bytes; the name is only what people
+        see. Each call reads ``document`` once from its start, so a retry with
+        the same ``idempotency_key`` sends the whole file again. ``caption`` is
+        up to 1024 characters, and ``mentions`` name people as they appear in it.
+        """
+        if document.size > MAX_DOCUMENT_BYTES:
+            raise UsageError(
+                f"FILE_TOO_LARGE: {document.file_name} is {document.size} bytes; "
+                f"the limit is {MAX_DOCUMENT_BYTES} (100 MB)"
+            )
+        if document.size <= 0:
+            raise UsageError(f"FILE_REQUIRED: {document.file_name} is empty")
+        fields = {"chat_id": chat_id}
+        if caption:
+            fields["caption"] = caption
+        if reply_to_message_id is not None:
+            fields["reply_to_message_id"] = reply_to_message_id
+        # Only when there is something to send, as in send_message (G12).
+        if mentions:
+            fields["mentions"] = mentions_field(mentions)
+        content_type, length, body = multipart_body(fields, document)
+        headers = {"Content-Type": content_type, "Content-Length": str(length)}
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+        # A Content-Length given with a stream keeps httpx from chunking it.
+        # The per-operation timeout still applies to every write, but not to
+        # the whole transfer, so a large file is not cut.
+        return message_from_wire(await self._call("sendDocument", None, headers, content=body()))
+
     async def get_webhook_info(self) -> WebhookInfo:
         """Report the bot's webhook state. Empty ``state`` means still polling."""
         raw = await self._call("getWebhookInfo", {})
@@ -195,10 +238,16 @@ class Client:
         method: str,
         body: Any,
         headers: dict[str, str] | None = None,
+        *,
+        content: AsyncIterator[bytes] | None = None,
     ) -> Any:
+        """POST ``body`` as JSON, or ``content`` as a prepared body."""
         url = f"{self._base_url}/bot{self._token}/{method}"
         try:
-            response = await self._http.post(url, json=body, headers=headers)
+            if content is not None:
+                response = await self._http.post(url, content=content, headers=headers)
+            else:
+                response = await self._http.post(url, json=body, headers=headers)
         except Exception as error:  # noqa: BLE001 - the URL is in here either way
             # Redact before it can reach a log.
             raise TransportError(

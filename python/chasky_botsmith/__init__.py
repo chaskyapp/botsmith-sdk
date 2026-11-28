@@ -48,6 +48,7 @@ from .errors import (
     TransportError,
     UsageError,
 )
+from .files import MAX_DOCUMENT_BYTES, InputFile
 from .polling import Polling, Transport
 from .types import (
     Attachment,
@@ -85,6 +86,8 @@ __all__ = [
     "DownloadError",
     "Event",
     "Handler",
+    "InputFile",
+    "MAX_DOCUMENT_BYTES",
     "MAX_LIMIT",
     "MAX_TIMEOUT_SECONDS",
     "Polling",
