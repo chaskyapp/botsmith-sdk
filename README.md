@@ -232,6 +232,15 @@ png, jpg, webp, m4a and video; anything else is `400 UNSUPPORTED_FILE_TYPE`.
 | Reply with it | `ctx.replyWithDocument(file, { caption })` | `e.ReplyDocument(ctx, file, chaskybot.DocumentOptions{Caption: c})` | `event.reply_document(file, caption=...)` |
 | Raw call | `client.sendDocument({ chatId, document })` | `client.SendDocument(ctx, params)` | `client.send_document(chat_id=..., document=...)` |
 
+**Known limitation, Python only.** When the server answers before reading the
+whole body (a `413`, or a `429` or `401` it decides from the headers) and
+closes the connection, asyncio drops that answer once the upload fails to
+write, so the Python SDK reports a transport error instead of the code. A
+transport error is transient, so the send is retried with the same key and the
+backoff, not `retry_after`. TypeScript and Go read the answer while they
+upload and report the code. Files that fit in the socket buffer, a few hundred
+KB, are not affected.
+
 A file from somewhere else (an attachment being forwarded, a generated report)
 is any object with a name, a size known in advance, and an `open` that yields
 its bytes from the start every time it is called.
