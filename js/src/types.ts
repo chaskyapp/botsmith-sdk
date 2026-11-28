@@ -42,13 +42,47 @@ export interface ReplyTo {
   text: string;
 }
 
+/**
+ * A file attached to a message (G14).
+ *
+ * `url` is the only way to the file: there is no getFile. It may expire within
+ * hours, so download it when the update arrives (`client.download`) and do not
+ * store it.
+ */
+export interface Attachment {
+  /** Opaque, like every identifier (G9). */
+  fileId: string;
+  /**
+   * `image`, `video`, `audio`, `voice` or `document` today. A string on
+   * purpose: a kind this version does not know still arrives (G10).
+   */
+  kind: string;
+  fileName: string;
+  mimeType: string;
+  /** Bytes. */
+  fileSize: number;
+  url: string;
+  /** Images and videos, when the server knows them. */
+  width?: number;
+  height?: number;
+  /** Seconds, for audio, voice and video, when the server knows it. */
+  duration?: number;
+}
+
 export interface BotMessage {
   messageId: MessageID;
   from: BotUser;
   chat: Chat;
   /** The wire carries seconds; this is a Date. */
   date: Date;
+  /** Empty when the message carries attachments: their text is `caption`. */
   text: string;
+  /** What was written with the attachments. Absent when nothing was. */
+  caption?: string;
+  /** At most 10; absent when none (G14). */
+  attachments?: Attachment[];
+  /** True when the message had more than the 10 attachments delivered. */
+  attachmentsTruncated?: boolean;
   /** The people mentioned, as the server sent them (G12). Absent when none. */
   mentions?: Mention[];
   /** True only when the message mentions THIS bot. Absent otherwise. */
@@ -149,12 +183,27 @@ export interface WireChat {
   title?: string;
 }
 
+export interface WireAttachment {
+  file_id: string;
+  kind: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+  url: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+}
+
 export interface WireBotMessage {
   message_id: MessageID;
   from?: WireUser;
   chat: WireChat;
   date: number;
   text: string;
+  caption?: string;
+  attachments?: WireAttachment[];
+  attachments_truncated?: boolean;
   mentions?: { user_id: UserID; name?: string }[];
   mentioned?: boolean;
   reply_to_message?: { message_id: MessageID; from?: WireUser; text?: string };

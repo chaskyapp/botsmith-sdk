@@ -1,6 +1,7 @@
-import { ChaskyApiError, ChaskyTransportError, ChaskyUsageError } from "./errors.js";
+import { ChaskyApiError, ChaskyDownloadError, ChaskyTransportError, ChaskyUsageError } from "./errors.js";
 import { redactError } from "./redact.js";
 import type {
+  Attachment,
   BotIdentity,
   BotMessage,
   BotUser,
@@ -13,6 +14,7 @@ import type {
   Update,
   UserID,
   WebhookInfo,
+  WireAttachment,
   WireBotMessage,
   WireChat,
   WireMemberState,
@@ -152,6 +154,34 @@ export class ChaskyBotClient {
     return true;
   }
 
+  /**
+   * Streams an attachment's bytes from its `url` (G14).
+   *
+   * The url is fetched exactly as received: it may carry a signature that
+   * rebuilding it would break. It points at the media store, not at the Bot
+   * API, so the request carries no token. Nothing is buffered; the caller reads
+   * the stream (in Node, `Readable.fromWeb(stream)` pipes it to a file).
+   */
+  async download(attachment: Pick<Attachment, "url">, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+    const where = withoutQuery(attachment.url);
+    let response: Response;
+    try {
+      response = await this.doFetch(attachment.url, { method: "GET", redirect: "follow", ...(signal ? { signal } : {}) });
+    } catch (error) {
+      // The query may hold a signature that grants access to the file: keep it
+      // out of the message, like the token.
+      throw new ChaskyTransportError(`download of ${where} failed: ${describe(error).replaceAll(attachment.url, where)}`, {
+        cause: redactError(error, this.token),
+        token: this.token,
+      });
+    }
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {});
+      throw new ChaskyDownloadError(response.status, where);
+    }
+    return response.body ?? new ReadableStream<Uint8Array>({ start: (c) => c.close() });
+  }
+
   private clampLimit(limit: number | undefined): number {
     if (limit === undefined) return MAX_LIMIT;
     if (!Number.isInteger(limit) || limit < 1) {
@@ -243,9 +273,27 @@ function toBotMessage(raw: WireBotMessage): BotMessage {
   // G12: ids pass through as the strings they arrived as.
   if (raw.mentions?.length) message.mentions = raw.mentions.map((m) => ({ userId: m.user_id, name: m.name ?? "" }));
   if (raw.mentioned) message.mentioned = true;
+  if (raw.caption) message.caption = raw.caption;
+  if (raw.attachments?.length) message.attachments = raw.attachments.map(toAttachment);
+  if (raw.attachments_truncated) message.attachmentsTruncated = true;
   const reply = raw.reply_to_message;
   if (reply) message.replyToMessage = { messageId: reply.message_id, from: toUser(reply.from), text: reply.text ?? "" };
   return message;
+}
+
+function toAttachment(raw: WireAttachment): Attachment {
+  const attachment: Attachment = {
+    fileId: raw.file_id,
+    kind: raw.kind,
+    fileName: raw.file_name ?? "",
+    mimeType: raw.mime_type ?? "",
+    fileSize: raw.file_size ?? 0,
+    url: raw.url,
+  };
+  if (raw.width) attachment.width = raw.width;
+  if (raw.height) attachment.height = raw.height;
+  if (raw.duration) attachment.duration = raw.duration;
+  return attachment;
 }
 
 function toMemberState(raw: WireMemberState | undefined): ChatMemberState {
@@ -289,6 +337,12 @@ function isInsecure(baseUrl: string): boolean {
     host.endsWith(".localhost") ||
     /^127\./.test(host)
   );
+}
+
+/** A URL without its query, which may hold a signature. */
+function withoutQuery(url: string): string {
+  const cut = url.search(/[?#]/);
+  return cut < 0 ? url : url.slice(0, cut);
 }
 
 function describe(error: unknown): string {

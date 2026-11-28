@@ -16,9 +16,10 @@ export {
   type GetUpdatesParams,
   type SendMessageParams,
 } from "./client.js";
-export { ChaskyApiError, ChaskyTransportError, ChaskyUsageError, ErrorDescription, type ErrorClass } from "./errors.js";
+export { ChaskyApiError, ChaskyDownloadError, ChaskyTransportError, ChaskyUsageError, ErrorDescription, type ErrorClass } from "./errors.js";
 export { polling, type PollingOptions, type Transport } from "./polling.js";
 export type {
+  Attachment,
   BotIdentity,
   BotMessage,
   BotUser,

@@ -34,6 +34,12 @@ export interface CreateBotOptions extends ChaskyBotClientOptions {
 export interface Bot {
   command(name: string, handler: Handler): Bot;
   on(event: "text", handler: Handler): Bot;
+  /**
+   * Runs for a message that carries attachments, instead of the text and
+   * command handlers: its `text` is empty and what was written is `caption`
+   * (G14).
+   */
+  on(event: "attachment", handler: Handler): Bot;
   /** Runs before the text and command handlers, for every update (G10). */
   on(event: "update", handler: UpdateHandler): Bot;
   onError(listener: (error: unknown) => void): Bot;
@@ -50,6 +56,7 @@ export function createBot(options: CreateBotOptions): Bot {
   const sendAttempts = options.sendAttempts ?? 4;
   const commands = new Map<string, Handler>();
   const textHandlers: Handler[] = [];
+  const attachmentHandlers: Handler[] = [];
   const updateHandlers: UpdateHandler[] = [];
   const errorListeners: ((error: unknown) => void)[] = [];
   const fatalListeners: ((error: unknown) => void)[] = [];
@@ -71,6 +78,12 @@ export function createBot(options: CreateBotOptions): Bot {
     const message = update.message;
     if (!message) return;
     const ctx = makeContext(update, message);
+    if (message.attachments?.length) {
+      // Never the text handler: it would see "" and answer a file as if it
+      // were an empty message (G14).
+      for (const attachmentHandler of attachmentHandlers) await attachmentHandler(ctx);
+      return;
+    }
     const handler = await commandHandler(message.text);
     if (handler) {
       await handler(ctx);
@@ -122,8 +135,9 @@ export function createBot(options: CreateBotOptions): Bot {
       commands.set(name.replace(/^\//, ""), handler);
       return bot;
     },
-    on(event: "text" | "update", handler: Handler | UpdateHandler) {
+    on(event: "text" | "attachment" | "update", handler: Handler | UpdateHandler) {
       if (event === "update") updateHandlers.push(handler as UpdateHandler);
+      else if (event === "attachment") attachmentHandlers.push(handler as Handler);
       else textHandlers.push(handler as Handler);
       return bot;
     },

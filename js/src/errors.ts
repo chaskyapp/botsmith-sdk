@@ -46,6 +46,21 @@ export class ChaskyTransportError extends Error {
   }
 }
 
+/**
+ * Downloading an attachment answered something other than 2xx. Not an API
+ * error: the media store has no envelope. A 403 or 404 usually means the url
+ * expired; it cannot be renewed, there is no getFile (G14).
+ */
+export class ChaskyDownloadError extends Error {
+  readonly status: number;
+
+  constructor(status: number, where: string) {
+    super(`download of ${where} failed: HTTP ${status}`);
+    this.name = "ChaskyDownloadError";
+    this.status = status;
+  }
+}
+
 /** Raised locally, before spending a request. */
 export class ChaskyUsageError extends Error {
   constructor(message: string) {
