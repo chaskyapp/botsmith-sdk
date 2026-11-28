@@ -701,6 +701,13 @@ to read in full before writing a bot.
   The download helper fetches `url` exactly as received, streamed and without
   the bot token: it points at the media store, may be signed, and expires
   within hours. There is no `getFile`. (`g14` pair)
+- **G15 — A document is streamed, sized, and retried as one message.**
+  `sendDocument` sends `multipart/form-data` with a `Content-Length`, reading
+  the file as a stream, never whole into memory. A file over 100 MB, or empty,
+  is refused locally before any request (A17). A transient failure resends the
+  whole file, read again from its start, with the **same** `Idempotency-Key`
+  (G4); a `413` is a business error of that send and is never resent. (`g15`
+  trio)
 
 #### Administration (M1–M5)
 
