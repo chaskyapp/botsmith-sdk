@@ -44,6 +44,8 @@ export interface HandlerSpec {
   replyText?: string;
   /** The reply mentions everyone the update mentioned, as `{name: user_id}` (G12). */
   mentionBack?: boolean;
+  /** `{ "<name>": "<reply text>" }`: each name is a command that replies with that text (G13). */
+  commands?: Record<string, string>;
 }
 
 export interface ManagementCall {

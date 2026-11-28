@@ -56,6 +56,8 @@ export function createBot(options: CreateBotOptions): Bot {
 
   let controller: AbortController | null = null;
   let loop: Promise<void> | null = null;
+  /** Learned from getMe the first time a suffixed command needs it (G13). */
+  let username: string | undefined;
 
   const emitError = (error: unknown): void => {
     for (const listener of errorListeners) listener(error);
@@ -69,13 +71,24 @@ export function createBot(options: CreateBotOptions): Bot {
     const message = update.message;
     if (!message) return;
     const ctx = makeContext(update, message);
-    const command = parseCommand(message.text);
-    const handler = command ? commands.get(command) : undefined;
+    const handler = await commandHandler(message.text);
     if (handler) {
       await handler(ctx);
       return;
     }
     for (const textHandler of textHandlers) await textHandler(ctx);
+  }
+
+  /** The handler for a command addressed to this bot, if any (G13). */
+  async function commandHandler(text: string): Promise<Handler | undefined> {
+    const { name, target } = parseCommand(text);
+    const handler = name ? commands.get(name) : undefined;
+    if (!handler || target === undefined) return handler;
+    // Asked once, and only when a suffix makes it matter. A failure is not
+    // cached: it surfaces like any handler failure and the next suffixed
+    // command asks again.
+    username ??= (await client.getMe(controller?.signal)).username;
+    return sameUsername(target, username) ? handler : undefined;
   }
 
   function makeContext(update: Update, message: BotMessage): Context {
@@ -194,7 +207,22 @@ function newIdempotencyKey(): string {
   return uuid;
 }
 
-function parseCommand(text: string): string | undefined {
-  const match = /^\/([A-Za-z0-9_]+)/.exec(text.trim());
-  return match?.[1];
+/**
+ * Splits `/name@target args` into its name and target, by the server's rule
+ * (isCommandFor): the command word runs from the slash to the first whitespace,
+ * with no trimming before the slash. `target` is undefined when there is no
+ * `@`, and `""` for a bare `/name@`, which addresses no bot. An empty `name`
+ * means the text is not a command at all.
+ */
+function parseCommand(text: string): { name: string; target: string | undefined } {
+  const match = /^\/([^ \t\r\n]*)/.exec(text);
+  if (!match) return { name: "", target: undefined };
+  const word = match[1]!;
+  const at = word.indexOf("@");
+  return at < 0 ? { name: word, target: undefined } : { name: word.slice(0, at), target: word.slice(at + 1) };
+}
+
+/** Case-insensitive, with a leading `@` ignored on the bot's side. */
+function sameUsername(target: string, username: string): boolean {
+  return target !== "" && target.toLowerCase() === username.replace(/^@/, "").toLowerCase();
 }

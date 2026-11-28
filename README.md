@@ -1,6 +1,6 @@
 # botsmith-sdk — Client SDKs for the Chasky Bot API
 
-**Status: implemented in TypeScript, Go and Python — 25/25 conformance each.**
+**Status: implemented in TypeScript, Go and Python — 26/26 conformance each.**
 
 Monorepo for the SDKs a bot author installs to talk to the Chasky Bot API —
 filling the role `telegraf` and `python-telegram-bot` fill for Telegram.
@@ -13,9 +13,9 @@ decisions that belong to each bot author.
 
 | Delivery | Language | Package | Status |
 |---|---|---|---|
-| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 25/25 conformance |
-| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 25/25 conformance |
-| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 25/25 conformance |
+| 1 | TypeScript | `@chasky/botsmith-sdk` | [`js/`](js/) — 26/26 conformance |
+| 2 | Go | `.../botsmith-sdk/go` | [`go/`](go/) — 26/26 conformance |
+| 3 | Python | `chasky-botsmith-sdk` | [`python/`](python/) — 26/26 conformance |
 
 ## Administration is a separate package, on purpose
 
@@ -48,7 +48,7 @@ contract). What keeps them apart now is cadence: administration follows the
 server's deltas, the runtime does not, and a change in one should never force a
 release of the other.
 
-All three pass the same 25 cases. The order was TypeScript → Go → Python, for
+All three pass the same 26 cases. The order was TypeScript → Go → Python, for
 the reason in §5 of the contract: **a conformance suite proves nothing with a
 single consumer**, and Go was the cheapest second port because the team already
 writes it.
@@ -65,7 +65,7 @@ case is not a tested runner.
 - **[docs/01-organization.md](docs/01-organization.md)** — how that contract
   survives three implementations without drifting: layout, what is invariant and
   what is idiomatic, conformance suite, versioning, work order.
-- **[conformance/](conformance/)** — 25 shared cases that turn the guarantees
+- **[conformance/](conformance/)** — 26 shared cases that turn the guarantees
   into failing tests. They get written **before** any SDK, and every guarantee in
   the contract has at least one.
 
@@ -140,6 +140,13 @@ When the bot is added, has its modes changed, or leaves a group, it receives a
 `{status, readMode, historyMode}`. To see it, register the catch-all handler,
 which runs for every update — including kinds this version of the SDK has no
 type for yet, which arrive with their raw form instead of being dropped (G10).
+
+**Commands in a group.** A command handler runs for `/start` and for
+`/start@its_username` (any case), and never for `/start@another_bot` or a bare
+`/start@`: those reach the text handler as plain text, because in read mode
+`all` the server delivers them to every bot in the group. The SDK learns its
+own username from `getMe`, once, the first time a suffixed command arrives
+(G13).
 
 **Sending to a group.** The same `sendMessage`, to the group's chat id. To
 mention someone, pass `mentions` as `{ "<name as it appears in your text>":

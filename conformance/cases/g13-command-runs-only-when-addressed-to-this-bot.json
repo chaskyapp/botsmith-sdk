@@ -1,0 +1,326 @@
+{
+  "id": "g13-command-runs-only-when-addressed-to-this-bot",
+  "contractVersion": "1.0",
+  "guarantee": "G13",
+  "title": "/cmd and /cmd@this_bot run the command; /cmd@another_bot and /cmd@ are plain text",
+  "why": "In a group several bots share one chat, and a command is addressed to one of them by its username: /help@pepi-bot. In read mode `all` the server delivers /help@another_bot to every bot in the group, so a bot that accepts any suffix answers commands meant for someone else and the group sees two bots reply. The opposite mistake is as bad: a bot that rejects every suffix never runs /help@pepi-bot, which is the only form that reaches it in read mode `mentions`. The server's rule is a bare /word, or /word@<this bot's username> compared case-insensitively; usernames contain '-', so a pattern of letters, digits and '_' cuts them short. The username comes from getMe, asked once, the first time a suffixed command needs it.",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply",
+      "commands": {
+        "help": "Help text."
+      }
+    }
+  },
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 1,
+              "message": {
+                "message_id": "m1",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800081,
+                "text": "/help"
+              }
+            },
+            {
+              "update_id": 2,
+              "message": {
+                "message_id": "m2",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800082,
+                "text": "/help@Pepi-Bot"
+              }
+            },
+            {
+              "update_id": 3,
+              "message": {
+                "message_id": "m3",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800083,
+                "text": "/help@other_bot"
+              }
+            },
+            {
+              "update_id": 4,
+              "message": {
+                "message_id": "m4",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800084,
+                "text": "/help@"
+              }
+            },
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana",
+                  "is_bot": false
+                },
+                "chat": {
+                  "id": "c-group",
+                  "type": "group",
+                  "title": "Grupo Test"
+                },
+                "date": 1795800085,
+                "text": "/help@pepi-bot now"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-group",
+          "text": "Help text."
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r1",
+            "from": {
+              "id": "bot:b1",
+              "name": "Pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800091,
+            "text": "Help text."
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getMe"
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "id": "bot:b1",
+            "is_bot": true,
+            "username": "pepi-bot",
+            "first_name": "Pepi"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-group",
+          "text": "Help text."
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r2",
+            "from": {
+              "id": "bot:b1",
+              "name": "Pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800092,
+            "text": "Help text."
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-group",
+          "text": "/help@other_bot"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r3",
+            "from": {
+              "id": "bot:b1",
+              "name": "Pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800093,
+            "text": "/help@other_bot"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-group",
+          "text": "/help@"
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r4",
+            "from": {
+              "id": "bot:b1",
+              "name": "Pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800094,
+            "text": "/help@"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/sendMessage",
+        "body": {
+          "chat_id": "c-group",
+          "text": "Help text."
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": {
+            "message_id": "r5",
+            "from": {
+              "id": "bot:b1",
+              "name": "Pepi",
+              "is_bot": true
+            },
+            "chat": {
+              "id": "c-group",
+              "type": "group",
+              "title": "Grupo Test"
+            },
+            "date": 1795800095,
+            "text": "Help text."
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 6
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false,
+    "errorsReported": []
+  },
+  "run": {
+    "timeoutMs": 3000
+  }
+}

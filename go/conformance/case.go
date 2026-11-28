@@ -48,6 +48,8 @@ type HandlerSpec struct {
 	ReplyText        string  `json:"replyText"`
 	// MentionBack: reply mentioning everyone the update mentioned (G12).
 	MentionBack bool `json:"mentionBack"`
+	// Commands: each name is a command that replies with its text (G13).
+	Commands map[string]string `json:"commands"`
 }
 
 type Assertions struct {
