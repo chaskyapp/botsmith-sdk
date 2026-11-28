@@ -49,6 +49,12 @@ class SdkBotUnderTest implements BotUnderTest {
       await ctx.reply(spec.replyText ?? ctx.message.text, mentions ? { mentions } : {});
     });
 
+    for (const [name, text] of Object.entries(spec.commands ?? {})) {
+      this.bot.command(name, async (ctx) => {
+        await ctx.reply(text);
+      });
+    }
+
     this.bot.onError((error) => this.errors.push(toReported(error)));
     this.bot.onFatal((error) => {
       // A fatal is also an error the author sees: cases assert on it by position

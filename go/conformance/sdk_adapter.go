@@ -81,6 +81,13 @@ func NewSDKBot(opts BotOptions) BotUnderTest {
 		_, err := e.ReplyWith(ctx, text, opts)
 		return err
 	})
+	for name, text := range spec.Commands {
+		text := text
+		bot.Command(name, func(ctx context.Context, e *chaskybot.Event) error {
+			_, err := e.Reply(ctx, text)
+			return err
+		})
+	}
 	bot.OnError(s.recordError)
 
 	s.bot = bot

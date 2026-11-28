@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Mapping
@@ -88,6 +89,8 @@ class Bot:
         self._update_handlers: list[UpdateHandler] = []
         self._error_listeners: list[Callable[[BaseException], None]] = []
         self._running = False
+        #: Learned from getMe the first time a suffixed command needs it (G13).
+        self._username: str | None = None
 
     def command(self, name: str) -> Callable[[Handler], Handler]:
         """Register a handler for ``/name``, as a decorator."""
@@ -165,13 +168,25 @@ class Bot:
             _attempts=self._attempts,
             _on_error=self._emit_error,
         )
-        command = _parse_command(update.message.text)
-        handler = self._commands.get(command) if command else None
+        handler = await self._command_handler(update.message.text)
         if handler is not None:
             await handler(event)
             return
         for fallback in self._handlers:
             await fallback(event)
+
+    async def _command_handler(self, text: str) -> Handler | None:
+        """The handler for a command addressed to this bot, if any (G13)."""
+        name, target = _parse_command(text)
+        handler = self._commands.get(name) if name else None
+        if handler is None or target is None:
+            return handler
+        if self._username is None:
+            # Asked once, and only when a suffix makes it matter. A failure is
+            # not cached: it surfaces like any handler failure and the next
+            # suffixed command asks again.
+            self._username = (await self.client.get_me()).username
+        return handler if _same_username(target, self._username) else None
 
 
 async def _send_with_retry(
@@ -217,14 +232,25 @@ async def _send_with_retry(
     raise last_error
 
 
-def _parse_command(text: str) -> str:
-    stripped = text.strip()
-    if not stripped.startswith("/"):
-        return ""
-    # split() on whitespace-only returns [], so indexing it would raise on a
-    # message that is just "/ ". Take the head defensively.
-    parts = stripped[1:].split()
-    if not parts:
-        return ""
-    name = parts[0]
-    return name if name.replace("_", "").isalnum() else ""
+#: The server's rule (isCommandFor): the command word runs from the slash to
+#: the first whitespace, with no trimming before the slash.
+_COMMAND_WORD = re.compile(r"/([^ \t\r\n]*)")
+
+
+def _parse_command(text: str) -> tuple[str, str | None]:
+    """Split ``/name@target args`` into ``(name, target)``.
+
+    ``target`` is None when there is no ``@``, and ``""`` for a bare ``/name@``,
+    which addresses no bot and so is never this one. A name of ``""`` means the
+    text is not a command at all.
+    """
+    match = _COMMAND_WORD.match(text)
+    if match is None:
+        return "", None
+    name, at, target = match.group(1).partition("@")
+    return name, (target if at else None)
+
+
+def _same_username(target: str, username: str) -> bool:
+    """Case-insensitive, with a leading ``@`` ignored on the bot's side."""
+    return target != "" and target.lower() == username.removeprefix("@").lower()

@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +75,9 @@ type Bot struct {
 	handlers       []Handler
 	updateHandlers []func(ctx context.Context, u *Update) error
 	onErrors       []func(error)
+	// username is learned from getMe the first time a suffixed command needs
+	// it (G13).
+	username string
 }
 
 func New(opts BotOptions) (*Bot, error) {
@@ -186,20 +188,56 @@ func (b *Bot) dispatch(ctx context.Context, update Update) error {
 		onError:  b.emitError,
 	}
 
+	handler, err := b.commandHandler(ctx, update.Message.Text)
+	if err != nil {
+		return err
+	}
+	if handler != nil {
+		return handler(ctx, event)
+	}
 	b.mu.Lock()
-	handler, isCommand := b.commands[parseCommand(update.Message.Text)]
 	fallbacks := append([]Handler{}, b.handlers...)
 	b.mu.Unlock()
 
-	if isCommand {
-		return handler(ctx, event)
-	}
 	for _, fn := range fallbacks {
 		if err := fn(ctx, event); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// commandHandler returns the handler for a command addressed to this bot, or
+// nil when the text is not one (G13).
+func (b *Bot) commandHandler(ctx context.Context, text string) (Handler, error) {
+	name, target, hasTarget := parseCommand(text)
+	if name == "" {
+		return nil, nil
+	}
+	b.mu.Lock()
+	handler := b.commands[name]
+	username := b.username
+	b.mu.Unlock()
+	if handler == nil || !hasTarget {
+		return handler, nil
+	}
+	if username == "" {
+		// Asked once, and only when a suffix makes it matter. A failure is not
+		// cached: it surfaces like any handler failure and the next suffixed
+		// command asks again.
+		me, err := b.client.GetMe(ctx)
+		if err != nil {
+			return nil, err
+		}
+		username = me.Username
+		b.mu.Lock()
+		b.username = username
+		b.mu.Unlock()
+	}
+	if !sameUsername(target, username) {
+		return nil, nil
+	}
+	return handler, nil
 }
 
 // sendWithRetry implements G4: one key per logical message, the SAME key on
@@ -256,12 +294,24 @@ func newIdempotencyKey() (string, error) {
 	return s[:8] + "-" + s[8:12] + "-" + s[12:16] + "-" + s[16:20] + "-" + s[20:], nil
 }
 
-var commandPattern = regexp.MustCompile(`^/([A-Za-z0-9_]+)`)
-
-func parseCommand(text string) string {
-	match := commandPattern.FindStringSubmatch(strings.TrimSpace(text))
-	if match == nil {
-		return ""
+// parseCommand splits "/name@target args" by the server's rule (isCommandFor):
+// the command word runs from the slash to the first whitespace, with no
+// trimming before the slash. hasTarget reports an "@"; a bare "/name@" has an
+// empty target, which addresses no bot. An empty name means the text is not a
+// command at all.
+func parseCommand(text string) (name, target string, hasTarget bool) {
+	if !strings.HasPrefix(text, "/") {
+		return "", "", false
 	}
-	return match[1]
+	word := text[1:]
+	if end := strings.IndexAny(word, " \t\r\n"); end >= 0 {
+		word = word[:end]
+	}
+	return strings.Cut(word, "@")
+}
+
+// sameUsername compares case-insensitively, with a leading "@" ignored on the
+// bot's side.
+func sameUsername(target, username string) bool {
+	return target != "" && strings.EqualFold(target, strings.TrimPrefix(username, "@"))
 }

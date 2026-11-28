@@ -123,6 +123,7 @@ function. The vocabulary is deliberately tiny; grow it only when a case needs it
 | `throwOnUpdateIds` | update ids on which the handler raises |
 | `replyText` | text to send; defaults to echoing the received text |
 | `mentionBack` | the reply mentions everyone the update mentioned, as `{name: user_id}`, and sends no `mentions` when the update had none (G12) |
+| `commands` | `{ "<name>": "<reply text>" }`: registers each name as a command whose handler replies with that text. Text that is not a command for this bot reaches the text handler as usual (G13) |
 
 The handler sees **every** update, including kinds the SDK has no type for
 (G10): each adapter counts runs in the SDK's catch-all hook, not in its text

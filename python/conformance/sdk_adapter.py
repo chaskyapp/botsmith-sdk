@@ -53,6 +53,9 @@ class SDKBot:
             )
             await event.reply(spec.get("replyText") or event.message.text, mentions=mentions)
 
+        for name, reply_text in (spec.get("commands") or {}).items():
+            self._bot.command(name)(_replying(reply_text))
+
         self._bot.on_error(self._record)
 
     async def start(self) -> None:
@@ -95,6 +98,13 @@ class SDKBot:
     def _record(self, error: BaseException) -> None:
         code = error.code if isinstance(error, APIError) else None
         self.errors.append(ReportedError(message=str(error), code=code))
+
+
+def _replying(text: str):  # noqa: ANN202 - a handler factory
+    async def handle(event: Event) -> None:
+        await event.reply(text)
+
+    return handle
 
 
 def factory(options: BotOptions) -> BotUnderTest:

@@ -684,6 +684,14 @@ to read in full before writing a bot.
 - **G12 — Mentions travel verbatim.** The `user_id` of each mention reaches the
   author as the string that arrived, and a send carries `mentions` only when the
   author gave some; never an empty or `null` field. (`g12`)
+- **G13 — A command runs only when it is addressed to this bot.** `/word` and
+  `/word@<this bot's username>` run the command registered as `word`; the
+  username compares case-insensitively, with a leading `@` ignored, and may
+  contain `-`. `/word@another_bot` and `/word@` are not commands for this bot
+  and reach the text handler as plain text. This is the server's own rule for
+  what counts as a command in read mode `mentions`, so the bot and the server
+  never disagree about it. The username comes from `getMe`, asked once, the
+  first time a suffixed command needs it. (`g13`)
 
 #### Administration (M1–M5)
 
