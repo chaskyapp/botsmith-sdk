@@ -86,6 +86,7 @@ class Bot:
         self._attempts = send_attempts
         self._commands: dict[str, Handler] = {}
         self._handlers: list[Handler] = []
+        self._attachment_handlers: list[Handler] = []
         self._update_handlers: list[UpdateHandler] = []
         self._error_listeners: list[Callable[[BaseException], None]] = []
         self._running = False
@@ -104,6 +105,15 @@ class Bot:
     def on_text(self, handler: Handler) -> Handler:
         """Register a handler for any text that matched no command."""
         self._handlers.append(handler)
+        return handler
+
+    def on_attachment(self, handler: Handler) -> Handler:
+        """Register a handler for a message that carries attachments (G14).
+
+        It runs instead of the command and text handlers: such a message has an
+        empty ``text``, and what was written is ``caption``.
+        """
+        self._attachment_handlers.append(handler)
         return handler
 
     def on_update(self, handler: UpdateHandler) -> UpdateHandler:
@@ -168,6 +178,12 @@ class Bot:
             _attempts=self._attempts,
             _on_error=self._emit_error,
         )
+        if update.message.attachments:
+            # Never the text handler: it would see "" and answer a file as if
+            # it were an empty message (G14).
+            for attachment_handler in self._attachment_handlers:
+                await attachment_handler(event)
+            return
         handler = await self._command_handler(update.message.text)
         if handler is not None:
             await handler(event)

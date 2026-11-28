@@ -93,18 +93,51 @@ class ReplyTo:
 
 
 @dataclass(frozen=True, slots=True)
+class Attachment:
+    """A file attached to a message (G14).
+
+    ``url`` is the only way to the file: there is no getFile. It may expire
+    within hours, so download it when the update arrives
+    (``Client.download``) and do not store it.
+    """
+
+    #: Opaque, like every identifier (G9).
+    file_id: str
+    #: "image", "video", "audio", "voice" or "document" today. A plain str on
+    #: purpose: a kind this version does not know still arrives (G10).
+    kind: str
+    file_name: str
+    mime_type: str
+    #: Bytes.
+    file_size: int
+    url: str
+    #: Images and videos, when the server knows them.
+    width: int | None = None
+    height: int | None = None
+    #: Seconds, for audio, voice and video, when the server knows it.
+    duration: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class BotMessage:
     message_id: MessageID
     from_user: User
     chat: Chat
     #: The wire carries seconds since the epoch; this is timezone-aware UTC.
     date: datetime
+    #: Empty when the message carries attachments: their text is ``caption``.
     text: str
     reply_to_message: ReplyTo | None = None
     #: The people mentioned (G12). Empty when none.
     mentions: tuple[Mention, ...] = ()
     #: True only when the message mentions THIS bot.
     mentioned: bool = False
+    #: What was written with the attachments. Empty when nothing was.
+    caption: str = ""
+    #: At most 10 (G14). Empty when none.
+    attachments: tuple[Attachment, ...] = ()
+    #: True when the message had more than the 10 attachments delivered.
+    attachments_truncated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +207,25 @@ def _date(raw: dict[str, Any]) -> datetime:
     return datetime.fromtimestamp(raw.get("date", 0), tz=timezone.utc)
 
 
+def _positive(value: Any) -> int | None:
+    # bool is an int in Python; a true "width" is not a width.
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def _attachment(raw: dict[str, Any]) -> Attachment:
+    return Attachment(
+        file_id=raw.get("file_id", ""),
+        kind=raw.get("kind", ""),
+        file_name=raw.get("file_name", ""),
+        mime_type=raw.get("mime_type", ""),
+        file_size=raw.get("file_size", 0),
+        url=raw.get("url", ""),
+        width=_positive(raw.get("width")),
+        height=_positive(raw.get("height")),
+        duration=_positive(raw.get("duration")),
+    )
+
+
 def message_from_wire(raw: dict[str, Any]) -> BotMessage:
     reply = raw.get("reply_to_message")
     return BotMessage(
@@ -187,6 +239,9 @@ def message_from_wire(raw: dict[str, Any]) -> BotMessage:
             for m in raw.get("mentions") or []
         ),
         mentioned=raw.get("mentioned") is True,
+        caption=raw.get("caption") or "",
+        attachments=tuple(_attachment(a) for a in raw.get("attachments") or [] if isinstance(a, dict)),
+        attachments_truncated=raw.get("attachments_truncated") is True,
         reply_to_message=(
             ReplyTo(
                 message_id=reply.get("message_id", ""),

@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import ipaddress
-from typing import Any, Callable, Mapping
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Callable, Mapping
 from urllib.parse import urlparse
 
 import httpx
 
-from .errors import APIError, TransportError, UsageError
+from .errors import APIError, DownloadError, TransportError, UsageError
 from .redact import redact_exception
 from .types import (
+    Attachment,
     BotIdentity,
     BotMessage,
     ChatAction,
@@ -132,6 +134,37 @@ class Client:
         await self._call("sendChatAction", {"chat_id": chat_id, "action": action})
         return True
 
+    @asynccontextmanager
+    async def download(self, attachment: Attachment) -> AsyncIterator[AsyncIterator[bytes]]:
+        """Stream an attachment's bytes from its ``url`` (G14)::
+
+            async with client.download(attachment) as chunks:
+                async for chunk in chunks:
+                    out.write(chunk)
+
+        The url is fetched exactly as received: it may carry a signature that
+        rebuilding it would break. It points at the media store, not at the Bot
+        API, so the request carries no token. Nothing is buffered.
+        """
+        url = attachment.url
+        where = _without_query(url)
+
+        def failure(error: BaseException) -> TransportError:
+            # The query may hold a signature that grants access to the file:
+            # keep it out of the message, like the token.
+            text = redact_exception(error, self._token).replace(url, where)
+            return TransportError(f"download of {where} failed: {text}")
+
+        try:
+            async with self._http.stream("GET", url, follow_redirects=True) as response:
+                if not 200 <= response.status_code < 300:
+                    raise DownloadError(response.status_code, where)
+                yield _chunks(response, failure)
+        except (DownloadError, TransportError):
+            raise
+        except httpx.HTTPError as error:
+            raise failure(error) from error
+
     def _clamp_limit(self, limit: int | None) -> int:
         if limit is None or limit == 0:
             return MAX_LIMIT
@@ -190,6 +223,23 @@ class Client:
                 retry_after = None
             raise APIError(code, description, method, retry_after)
         return envelope.get("result")
+
+
+async def _chunks(
+    response: httpx.Response, failure: Callable[[BaseException], TransportError]
+) -> AsyncIterator[bytes]:
+    try:
+        async for chunk in response.aiter_bytes():
+            yield chunk
+    except httpx.HTTPError as error:
+        raise failure(error) from error
+
+
+def _without_query(url: str) -> str:
+    """The url without its query and fragment, which may hold a signature."""
+    for mark in "?#":
+        url = url.split(mark, 1)[0]
+    return url
 
 
 def _is_insecure(base_url: str) -> bool:

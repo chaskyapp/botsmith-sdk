@@ -44,11 +44,13 @@ from .errors import (
     TOO_MANY_REQUESTS,
     APIError,
     ChaskyError,
+    DownloadError,
     TransportError,
     UsageError,
 )
 from .polling import Polling, Transport
 from .types import (
+    Attachment,
     BotIdentity,
     BotMessage,
     Chat,
@@ -69,6 +71,7 @@ __all__ = [
     "TOO_MANY_MENTIONS",
     "TOO_MANY_REQUESTS",
     "APIError",
+    "Attachment",
     "Bot",
     "BotIdentity",
     "BotMessage",
@@ -79,6 +82,7 @@ __all__ = [
     "ChatMemberUpdated",
     "Client",
     "DEFAULT_BASE_URL",
+    "DownloadError",
     "Event",
     "Handler",
     "MAX_LIMIT",
