@@ -15,6 +15,7 @@ The guarantees are identical to the other two SDKs; the shape is Python's.
 | Terminal failure | `onFatal` callback | returned by `Run` | **raised** |
 | Handlers | `bot.on("text", fn)` | `bot.Handle(fn)` | `@bot.on_text` |
 | Every update | `bot.on("update", fn)` | `bot.HandleUpdate(fn)` | `@bot.on_update` |
+| Attachments | `bot.on("attachment", fn)` | `bot.HandleAttachment(fn)` | `@bot.on_attachment`, then `client.download(a)` |
 | Reply with mentions | `ctx.reply(text, { mentions })` | `e.ReplyWith(ctx, text, opts)` | `event.reply(text, mentions=...)` |
 | Entry point | `await bot.start()` | `bot.Run(ctx)` | `await bot.run()` |
 | Conformance | a CLI | `go test` | `unittest` |
