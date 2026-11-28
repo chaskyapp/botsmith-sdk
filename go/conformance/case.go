@@ -57,6 +57,13 @@ type HandlerSpec struct {
 	// received; DownloadAttachments makes it download each one too (G14).
 	RecordAttachments   bool `json:"recordAttachments"`
 	DownloadAttachments bool `json:"downloadAttachments"`
+	// ReplyDocument: reply with a document of this many bytes instead of a
+	// text (G15).
+	ReplyDocument *struct {
+		FileName string `json:"fileName"`
+		Bytes    int64  `json:"bytes"`
+		Caption  string `json:"caption"`
+	} `json:"replyDocument"`
 }
 
 type Assertions struct {
@@ -80,7 +87,9 @@ type Assertions struct {
 		ManagementCode string `json:"managementCode"`
 		Retryable      *bool  `json:"retryable"`
 		AccessLost     *bool  `json:"accessLost"`
-		NotContains    string `json:"notContains"`
+		// Contains is how a case names a local error, which has no code (G15).
+		Contains    string `json:"contains"`
+		NotContains string `json:"notContains"`
 	} `json:"errorsReported"`
 	Warnings []struct {
 		Contains string `json:"contains"`

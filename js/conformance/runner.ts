@@ -387,6 +387,11 @@ function checkAssertions(testCase: ConformanceCase, bot: BotUnderTest, lifecycle
         failure("assert.errorsReported", `error #${i + 1}: expected code ${expected.code}, got ${actual.code}`),
       );
     }
+    if (expected.contains && !actual.message.includes(expected.contains)) {
+      failures.push(
+        failure("assert.errorsReported", `error #${i + 1}: expected it to mention ${expected.contains}, got ${JSON.stringify(redact(actual.message))}`),
+      );
+    }
     if (expected.notContains) {
       const needle = expected.notContains.replaceAll("{token}", TEST_TOKEN);
       if (actual.message.includes(needle)) {

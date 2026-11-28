@@ -1,0 +1,84 @@
+{
+  "contractVersion": "1.0",
+  "guarantee": "G15",
+  "bot": {
+    "transport": "polling",
+    "options": {
+      "limit": 50,
+      "timeoutSeconds": 25
+    },
+    "handler": {
+      "kind": "reply",
+      "replyDocument": {
+        "fileName": "big.pdf",
+        "bytes": 104857601
+      }
+    }
+  },
+  "run": {
+    "timeoutMs": 3000
+  },
+  "id": "g15-document-over-the-limit-is-rejected-without-a-request",
+  "title": "A file over 100 MB is rejected by the SDK before any request is made",
+  "why": "The server accepts at most 100 MB per file (decision A17 of its SDD) and answers 413 to anything larger, but only after the client has spent the time and bandwidth to send it. The SDK knows the size before it opens the connection: it must refuse locally, with the reason, and send nothing. The same rule as clamping a limit the server would reject (G6): never spend a request to be told what the SDK already knew.",
+  "exchanges": [
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 0
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": [
+            {
+              "update_id": 5,
+              "message": {
+                "message_id": "m5",
+                "from": {
+                  "id": "u1",
+                  "name": "Ana"
+                },
+                "chat": {
+                  "id": "bot:bot:b1:u1",
+                  "type": "private"
+                },
+                "date": 1795800085,
+                "text": "send me the report"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "method": "POST",
+        "path": "/bot{token}/getUpdates",
+        "body": {
+          "offset": 6
+        }
+      },
+      "respond": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "result": []
+        }
+      },
+      "repeat": true
+    }
+  ],
+  "assert": {
+    "botStopped": false,
+    "errorsReported": [
+      {
+        "contains": "FILE_TOO_LARGE"
+      }
+    ]
+  }
+}

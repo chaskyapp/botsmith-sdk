@@ -53,6 +53,7 @@ export class FakeServer {
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const raw = await readBody(req);
+    const contentType = req.headers["content-type"] ?? "";
     const receivedAt = Date.now();
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) {
@@ -63,7 +64,7 @@ export class FakeServer {
       method: req.method ?? "",
       path: req.url ?? "",
       headers,
-      body: parseJson(raw),
+      body: contentType.startsWith("multipart/form-data") ? parseMultipart(raw, contentType) : parseJson(raw.toString("utf8")),
       receivedAt,
     };
 
@@ -106,13 +107,46 @@ export class FakeServer {
   }
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
+function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => (data += chunk));
-    req.on("end", () => resolve(data));
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
+}
+
+/**
+ * A multipart body as an object: text fields as strings, file parts as
+ * `{fileName, size}` (SCHEMA.md). Anything malformed comes back as the raw
+ * text, so the case fails on the field it expected rather than on a crash.
+ */
+function parseMultipart(raw: Buffer, contentType: string): Json {
+  const boundary = /boundary="?([^";]+)"?/.exec(contentType)?.[1];
+  if (!boundary) return raw.toString("latin1");
+  const delimiter = Buffer.from(`--${boundary}`);
+  const out: Record<string, Json> = {};
+  let at = raw.indexOf(delimiter);
+  while (at >= 0) {
+    const start = at + delimiter.length;
+    if (raw.subarray(start, start + 2).toString() === "--") return out;
+    const next = raw.indexOf(delimiter, start);
+    if (next < 0) break;
+    const part = raw.subarray(start + 2, next - 2); // drop the CRLFs around it
+    const split = part.indexOf("\r\n\r\n");
+    if (split < 0) break;
+    const head = part.subarray(0, split).toString("utf8");
+    const content = part.subarray(split + 4);
+    const name = /[;\s]name="((?:[^"\\]|\\.)*)"/.exec(head)?.[1];
+    const fileName = /filename="((?:[^"\\]|\\.)*)"/.exec(head)?.[1];
+    if (name === undefined) break;
+    out[name] =
+      fileName === undefined
+        ? content.toString("utf8")
+        : { fileName: fileName.replace(/\\(.)/g, "$1"), size: content.length };
+    at = next;
+  }
+  return raw.toString("latin1");
 }
 
 function parseJson(raw: string): Json {

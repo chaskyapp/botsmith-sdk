@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -63,10 +64,14 @@ class FakeServer:
                     # a null body failed cases at random, under load.
                     self.close_connection = True
                     return
-                try:
-                    body = json.loads(raw) if raw else None
-                except json.JSONDecodeError:
-                    body = raw.decode("utf-8", "replace")
+                content_type = self.headers.get("Content-Type") or ""
+                if content_type.startswith("multipart/form-data"):
+                    body = _parse_multipart(raw, content_type)
+                else:
+                    try:
+                        body = json.loads(raw) if raw else None
+                    except json.JSONDecodeError:
+                        body = raw.decode("utf-8", "replace")
                 received_at = time.monotonic()
                 record = ObservedRequest(
                     method=self.command,
@@ -193,3 +198,38 @@ class FakeServer:
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=2)
+
+
+def _parse_multipart(raw: bytes, content_type: str) -> Any:
+    """A multipart body as an object: text fields as strings, file parts as
+    ``{fileName, size}`` (SCHEMA.md). Anything malformed comes back as text, so
+    the case fails on the field it expected rather than on a crash.
+    """
+    found = re.search(r'boundary="?([^";]+)"?', content_type)
+    fallback = raw.decode("latin-1")
+    if found is None:
+        return fallback
+    delimiter = b"--" + found.group(1).encode()
+    out: dict[str, Any] = {}
+    pieces = raw.split(delimiter)
+    # pieces[0] is the preamble; the last starts with "--" (the closing one).
+    for piece in pieces[1:]:
+        if piece.startswith(b"--"):
+            return out
+        part = piece[2:-2]  # the CRLFs around the part
+        head, sep, content = part.partition(b"\r\n\r\n")
+        if not sep:
+            return fallback
+        header = head.decode("utf-8", "replace")
+        name = re.search(r'[;\s]name="((?:[^"\\]|\\.)*)"', header)
+        file_name = re.search(r'filename="((?:[^"\\]|\\.)*)"', header)
+        if name is None:
+            return fallback
+        if file_name is None:
+            out[name.group(1)] = content.decode("utf-8", "replace")
+        else:
+            out[name.group(1)] = {
+                "fileName": re.sub(r"\\(.)", r"\1", file_name.group(1)),
+                "size": len(content),
+            }
+    return fallback

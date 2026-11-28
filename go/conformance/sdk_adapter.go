@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -23,6 +25,7 @@ type sdkBot struct {
 	errs          []ReportedError
 	warns         []string
 	seen          []any
+	scratch       string
 }
 
 func NewSDKBot(opts BotOptions) BotUnderTest {
@@ -47,6 +50,26 @@ func NewSDKBot(opts BotOptions) BotUnderTest {
 	}
 
 	spec := opts.Handler
+	var document chaskybot.InputFile
+	if d := spec.ReplyDocument; d != nil {
+		// Sparse: the size is what the case is about, and a 100 MB file of
+		// holes costs no disk and no time to create.
+		dir, err := os.MkdirTemp("", "botsmith-conformance-")
+		if err != nil {
+			panic(fmt.Sprintf("conformance: %s", err))
+		}
+		s.scratch = dir
+		path := filepath.Join(dir, d.FileName)
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			panic(fmt.Sprintf("conformance: %s", err))
+		}
+		if err := os.Truncate(path, d.Bytes); err != nil {
+			panic(fmt.Sprintf("conformance: %s", err))
+		}
+		if document, err = chaskybot.FileFromPath(path); err != nil {
+			panic(fmt.Sprintf("conformance: %s", err))
+		}
+	}
 	// Counted in the catch-all hook, so an update kind the SDK has no type for
 	// is counted too (G10).
 	bot.HandleUpdate(func(ctx context.Context, u *chaskybot.Update) error {
@@ -65,6 +88,10 @@ func NewSDKBot(opts BotOptions) BotUnderTest {
 		}
 		if spec.Kind == "noop" {
 			return nil
+		}
+		if d := spec.ReplyDocument; d != nil {
+			_, err := e.ReplyDocument(ctx, document, chaskybot.DocumentOptions{Caption: d.Caption})
+			return err
 		}
 		text := spec.ReplyText
 		if text == "" {
@@ -157,6 +184,9 @@ func (s *sdkBot) StartAgain() error {
 }
 
 func (s *sdkBot) Stop() {
+	if s.scratch != "" {
+		defer os.RemoveAll(s.scratch)
+	}
 	if s.cancel != nil {
 		s.cancel()
 	}

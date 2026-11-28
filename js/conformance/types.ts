@@ -52,6 +52,8 @@ export interface HandlerSpec {
   recordAttachments?: boolean;
   /** That handler also downloads every attachment and records the byte count. */
   downloadAttachments?: boolean;
+  /** Reply with a document of this many bytes instead of a text (G15). */
+  replyDocument?: { fileName: string; bytes: number; caption?: string };
 }
 
 export interface ManagementCall {
@@ -76,6 +78,8 @@ export interface Assertions {
     managementCode?: string;
     retryable?: boolean;
     accessLost?: boolean;
+    /** The message contains this; how a case names a local error (G15). */
+    contains?: string;
     notContains?: string;
   }[];
   warnings?: { contains: string }[];
