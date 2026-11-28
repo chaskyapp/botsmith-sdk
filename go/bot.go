@@ -47,6 +47,31 @@ func (e *Event) ReplyWith(ctx context.Context, text string, o ReplyOptions) (*Me
 	}, e.attempts, e.onError)
 }
 
+// DocumentOptions are the optional parts of a document reply.
+type DocumentOptions struct {
+	// Caption is up to 1024 characters; Mentions name people as they appear
+	// in it.
+	Caption          string
+	ReplyToMessageID MessageID
+	Mentions         map[string]UserID
+}
+
+// ReplyDocument sends a file to this update's chat with a managed
+// Idempotency-Key. A transient failure resends the whole file, opened again,
+// under the same key; a 413 is not resent (G15).
+func (e *Event) ReplyDocument(ctx context.Context, file InputFile, o DocumentOptions) (*Message, error) {
+	return withRetry(ctx, func(key string) (*Message, error) {
+		return e.client.SendDocument(ctx, SendDocumentParams{
+			ChatID:           e.ChatID,
+			Document:         file,
+			Caption:          o.Caption,
+			ReplyToMessageID: o.ReplyToMessageID,
+			Mentions:         o.Mentions,
+			IdempotencyKey:   key,
+		})
+	}, e.attempts, e.onError)
+}
+
 // Typing is explicit on purpose: the runtime never sends a chat action by
 // itself. Whether the indicator helps depends on how long the bot takes, which
 // is the author's call, not the SDK's.
@@ -273,18 +298,25 @@ func (b *Bot) commandHandler(ctx context.Context, text string) (Handler, error) 
 // one key across different messages makes the server discard the second
 // SILENTLY, which is worse because it looks like it worked.
 func sendWithRetry(ctx context.Context, c *Client, p SendMessageParams, attempts int, onError func(error)) (*Message, error) {
+	return withRetry(ctx, func(key string) (*Message, error) {
+		p.IdempotencyKey = key
+		return c.SendMessage(ctx, p)
+	}, attempts, onError)
+}
+
+// withRetry runs one logical send: one key, the same on every attempt.
+func withRetry(ctx context.Context, send func(key string) (*Message, error), attempts int, onError func(error)) (*Message, error) {
 	key, err := newIdempotencyKey()
 	if err != nil {
 		return nil, err
 	}
-	p.IdempotencyKey = key
 
 	var last error
 	for attempt := 1; attempt <= attempts; attempt++ {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		message, err := c.SendMessage(ctx, p)
+		message, err := send(key)
 		if err == nil {
 			return message, nil
 		}

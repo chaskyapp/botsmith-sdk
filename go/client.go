@@ -264,18 +264,26 @@ func (c *Client) call(ctx context.Context, method string, body any, headers map[
 	if err != nil {
 		return &UsageError{Message: fmt.Sprintf("%s: could not encode the request: %s", method, err)}
 	}
+	return c.send(ctx, c.http, method, bytes.NewReader(payload), int64(len(payload)), "application/json", headers, out)
+}
+
+// send posts a prepared body and reads the envelope. length is the exact body
+// size, sent as Content-Length.
+func (c *Client) send(ctx context.Context, client *http.Client, method string, body io.Reader, length int64,
+	contentType string, headers map[string]string, out any) error {
 	endpoint := c.baseURL + "/bot" + c.token + "/" + method
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, body)
 	if err != nil {
 		return &TransportError{Method: method, cause: redactError(err, c.token)}
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.ContentLength = length
+	req.Header.Set("Content-Type", contentType)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 
-	resp, err := c.http.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		// The URL is in here. Redact before it can reach a log.
 		return &TransportError{Method: method, cause: redactError(err, c.token)}
